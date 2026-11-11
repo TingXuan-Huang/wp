@@ -1,0 +1,13 @@
+# E1 task: (redirect) rewrite 10 CounterFact facts. See experiment.md.
+# The generation settings match this task's evaluation in tasks/__init__.py.
+name: e1-facts
+model: qwen3.5-0.8b-nothink
+agent_prompt: prompts/agent/edit_weights.md
+task_prompt: prompts/agent/tasks/facts.md
+practice_data: prompts/test/facts/practice.jsonl
+select_data: prompts/test/facts/select.jsonl
+eval_data: [facts, gsm8k, mmlu_pro, neutral]
+generation: {temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.5, max_new_tokens: 64}
+samples_per_problem: 1
+budget: {forward_passes: 25, max_turns: 150}
+backends: {claude_api: {refusal_fallback: false}}   # keep every turn on one model

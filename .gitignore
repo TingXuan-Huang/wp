@@ -1,0 +1,10 @@
+runs/
+models/
+.local/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+# built by setup.sh (python -m tasks.build); only the hand-written smoke set is kept in git
+prompts/test/*
+!prompts/test/math_smoke.jsonl

@@ -1,0 +1,13 @@
+# E1 task: (add) add two 6- to 8-digit numbers. See experiment.md.
+# The generation settings match this task's evaluation in tasks/__init__.py.
+name: e1-addition
+model: qwen3.5-0.8b-nothink
+agent_prompt: prompts/agent/edit_weights.md
+task_prompt: prompts/agent/tasks/addition.md
+practice_data: prompts/test/addition/practice.jsonl
+select_data: prompts/test/addition/select.jsonl
+eval_data: [addition, gsm8k, mmlu_pro, neutral]
+generation: {temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.5, max_new_tokens: 32}
+samples_per_problem: 1
+budget: {forward_passes: 25, max_turns: 150}
+backends: {claude_api: {refusal_fallback: false}}   # keep every turn on one model

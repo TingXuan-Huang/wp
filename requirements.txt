@@ -1,0 +1,12 @@
+# Python 3.10+
+torch
+transformers>=5.6.2
+flash-linear-attention; sys_platform == "linux"   # fast Qwen kernels (CUDA only)
+safetensors
+huggingface_hub
+pyyaml
+matplotlib     # experiment figures
+anthropic      # claude_api backend
+openai         # openai_api backend
+datasets       # tasks/build.py
+math-verify[antlr4_13_2]   # grading

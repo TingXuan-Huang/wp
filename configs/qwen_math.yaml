@@ -1,0 +1,6 @@
+# Experiment 8 from the post: make Qwen3.5-0.8B better at math by editing its weights.
+# The data is built by setup.sh (python -m tasks.build).
+name: qwen_math
+model: qwen3.5-0.8b
+practice_data: prompts/test/gsm8k_train.jsonl
+eval_data: [math500, gsm8k_test]

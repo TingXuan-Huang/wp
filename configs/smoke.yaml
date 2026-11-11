@@ -1,0 +1,28 @@
+# Checks the plumbing in about a minute on a laptop. The tiny model is random, so scores mean nothing.
+# Add backend=scripted to test everything except the agent, for free.
+name: smoke
+model: tiny
+batch_size: 4
+samples_per_problem: 1
+budget: {forward_passes: 3, max_turns: 12, cell_timeout_s: 300}
+generation: {max_new_tokens: 32, presence_penalty: 0}
+backends:
+  scripted:
+    replies:
+      - |
+        ```python
+        list_params("h.0.mlp")
+        ```
+      - |
+        ```python
+        name = "transformer.h.0.mlp.c_proj.weight"
+        tensor = load(name)
+        tensor[0, 0] += 1
+        save_edit(name, tensor)
+        print(edited())
+        ```
+      - |
+        ```python
+        result = generate([item["prompt"] for item in practice(2)], model="both")
+        print(result["edited"][0]["tokens"], passes_left())
+        ```

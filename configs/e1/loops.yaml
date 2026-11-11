@@ -1,0 +1,13 @@
+# E1 task: (remove) stop thinking-mode loops on GSM8K. See experiment.md.
+# The generation settings match this task's evaluation in tasks/__init__.py.
+name: e1-loops
+model: qwen3.5-0.8b
+agent_prompt: prompts/agent/edit_weights.md
+task_prompt: prompts/agent/tasks/loops.md
+practice_data: prompts/test/loops/practice.jsonl
+select_data: prompts/test/loops/select.jsonl
+eval_data: [loops, gsm8k, mmlu_pro, neutral]
+generation: {temperature: 0.6, top_p: 0.95, top_k: 20, presence_penalty: 1.5, max_new_tokens: 8192}
+samples_per_problem: 1
+budget: {forward_passes: 25, max_turns: 150}
+backends: {claude_api: {refusal_fallback: false}}   # keep every turn on one model

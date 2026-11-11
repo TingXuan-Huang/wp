@@ -1,0 +1,59 @@
+# Shared defaults. Experiment configs override these; so does the command line:
+#   python run.py configs/qwen_math.yaml backend=codex_cli internet.web_search=true
+
+name: experiment
+seed: 0
+
+# ---------- who edits the weights ----------
+backend: claude_cli        # claude_api | openai_api | claude_cli | codex_cli
+backends:                  # the post used gpt-6-astra at effort=max
+  claude_api: {model: claude-opus-5-5, effort: high, refusal_fallback: true}
+  openai_api: {model: gpt-6-astra, effort: high}
+  claude_cli: {model: claude-opus-5-5, effort: high, bin: claude}   # your Claude subscription
+  codex_cli:  {model: gpt-6-astra, effort: high, bin: codex}        # your ChatGPT subscription
+
+# ---------- internet ----------
+internet:
+  web_search: false        # can the agent itself search the web?
+  kernel: false            # can the agent's Python code reach the network?
+
+# ---------- what the agent sees ----------
+model: tiny                # a key in playground/models.yaml
+agent_prompt: prompts/agent/edit_for_math.md
+task_prompt: null          # optional file pasted into {{task}} in the agent prompt
+tools: [tools_basic.weights, tools_basic.run_model, tools_basic.data]   # modules the agent gets functions from
+practice_data: prompts/test/math_smoke.jsonl   # the agent can use these
+select_data: null                              # optional second split, for before/after checks of an edit
+eval_data: [smoke]                             # dataset names from tasks/__init__.py; only evaluate.py uses these
+scorer: score_math                             # default grader in playground/scoring.py (items can name their own)
+run_dir: null              # where to write the run; default runs/<name>-<backend>-<time>
+
+# ---------- limits ----------
+budget:
+  forward_passes: 50             # one generate() or read() call = one pass
+  max_generations_per_pass: 512
+  max_texts_per_pass: 1024
+  max_turns: 300                 # code blocks the agent may run
+  cell_timeout_s: 3600           # a cell over this restarts the kernel
+  max_output_chars: 20000
+
+# Code matching any of these is refused before it runs.
+forbid:
+  - '\.backward\('
+  - 'torch\.optim'
+  - 'autograd'
+  - 'enable_grad'
+  - 'set_grad_enabled'
+  - 'requires_grad'
+  - 'from_pretrained'
+
+# ---------- how the model generates (the post's Qwen thinking-mode settings) ----------
+device: auto               # auto | cuda | mps | cpu
+batch_size: 16             # internal batching; lower it if you run out of memory
+generation:
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 20
+  presence_penalty: 1.5
+  max_new_tokens: 32768
+samples_per_problem: 4     # evaluate.py only

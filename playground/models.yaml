@@ -1,0 +1,20 @@
+# To add a model, add an entry here. hf_id can be a Hugging Face repo or a local folder.
+#   dtype          how the weights are stored
+#   chat_template  extra arguments for the tokenizer's chat template
+#   frozen         regexes of tensor names the agent may not edit
+
+tiny:
+  hf_id: hf-internal-testing/tiny-random-gpt2
+  dtype: float32
+
+qwen3.5-0.8b:
+  hf_id: Qwen/Qwen3.5-0.8B
+  dtype: bfloat16
+  chat_template: {enable_thinking: true}
+  frozen: ['^model\.norm\.weight$', 'embed_tokens\.weight$', 'lm_head\.weight$']
+
+qwen3.5-0.8b-nothink:      # same weights, answers directly without a thinking section
+  hf_id: Qwen/Qwen3.5-0.8B
+  dtype: bfloat16
+  chat_template: {enable_thinking: false}
+  frozen: ['^model\.norm\.weight$', 'embed_tokens\.weight$', 'lm_head\.weight$']
