@@ -8,3 +8,5 @@ __pycache__/
 # built by setup.sh (python -m tasks.build); only the hand-written smoke set is kept in git
 prompts/test/*
 !prompts/test/math_smoke.jsonl
+# made-up example results, rebuilt by examples/make_demo.py
+examples/demo/

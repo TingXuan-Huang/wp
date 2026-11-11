@@ -70,8 +70,32 @@ def original_records(session, name, items, split, limit):
     return records
 
 
-def summarize(original, edited):
+def _clip(text, head=300, tail=700):
+    return text if len(text) <= head + tail else f"{text[:head]} [...] {text[-tail:]}"
+
+
+def flip_examples(items, original, edited, k=8):
+    """Up to k items that went wrong->right and right->wrong, with both answers, for reading by hand."""
+    def answer(record, item):
+        if "text" in record:
+            return _clip(record["text"])
+        return f"log p({item['target_new'].strip()}) - log p({item['target_true'].strip()}) = {record['margin']:+.2f}"
+
+    examples = {"wrong_to_right": [], "right_to_wrong": []}
+    for before, after in zip(original, edited):
+        key = ("wrong_to_right" if after["correct"] else "right_to_wrong") if before["correct"] != after["correct"] \
+            else None
+        if key and len(examples[key]) < k:
+            item = items[before["item"]]
+            examples[key].append({"prompt": _clip(item["prompt"]), "original": answer(before, item),
+                                  "edited": answer(after, item)})
+    return examples
+
+
+def summarize(original, edited, items=None):
     summary = paired(original, edited)
+    if items is not None:
+        summary["examples"] = flip_examples(items, original, edited)
     groups = sorted({r["group"] for r in original if r.get("group")})
     if groups:
         summary["groups"] = {g: paired([r for r in original if r.get("group") == g],
@@ -99,7 +123,7 @@ def evaluate_run(session, run_dir, names, split="test", limit=None, force=False)
             original = original_records(session, name, items, split, limit)
             edited = score_records(session, name, items, "edited") if session.originals else original
             path.with_suffix(".jsonl").write_text("".join(json.dumps(r) + "\n" for r in edited))
-            summary = summarize(original, edited)
+            summary = summarize(original, edited, items)
         path.with_suffix(".json").write_text(json.dumps(summary, indent=2))
         summaries[name] = summary
     return summaries

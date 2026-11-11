@@ -28,7 +28,8 @@ chat.py                 talk to a model yourself
 configs/                default.yaml (every setting), one file per experiment; configs/e1/ for E1's tasks
 experiments/            the E1, E2 and E3 runners and the non-agent baselines
 tasks/                  the datasets: how each is built and evaluated
-analysis/               evaluation, paired statistics, edit maps and structure, figures
+analysis/               evaluation, paired statistics, edit maps and structure, figures, the review page
+examples/make_demo.py   made-up results, to preview the review page
 backends/api.py         Claude API, OpenAI API (pay per token)
 backends/cli.py         `claude -p`, `codex exec` (your subscriptions)
 backends/scripted.py    replays fixed replies, for testing without an agent

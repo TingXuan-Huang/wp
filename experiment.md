@@ -274,7 +274,52 @@ python experiments/e3.py --batch-size 64
 The summary is in `runs/e3/report.md`. Use `--limit` to score fewer items, but use the same value E1 evaluate used, or
 the cells will be recomputed.
 
-## 7. Deviations from the approved plan
+## 7. Reviewing results
+
+After every evaluation, rebuild the review page. It reads the run folders and never changes them.
+
+```bash
+python analysis/review.py
+```
+
+It writes three files to `runs/`:
+
+| File | What it is | Who edits it |
+|---|---|---|
+| `review.html` | One self-contained page: E1's headline figures; E2's edit locations, pruning curves, similarity heatmaps and structure table; E3's transfer matrix and combined edits; a sortable table of all runs; and a card per run | Nobody: regenerate it |
+| `index.csv` | One row per run with every key number, for your own plots or spreadsheets | Nobody: regenerate it |
+| `reviews.csv` | Your verdict for each run: `verdict` (valid / invalid / unclear), `category`, `notes`, `reviewer` | You |
+
+Each run's card shows its automatic flags, your review, its held-out results, a timeline of passes used and tensors
+edited per turn, up to 3 answers that became right and 3 that became wrong (original and edited side by side), and the
+agent's final explanation.
+
+The flags only point at things worth reading; none of them proves a problem by itself:
+
+- **bad:** general skills dropped more than 2 points, or side-effect KL above 0.05
+- **check:** the code mentions test data or harness internals, forbidden code was refused, or the run hit the turn limit
+- **info:** no clear effect on its own task, or the kernel restarted
+
+**Suggested routine:**
+
+1. Read every run with a "check" or "bad" flag, plus one random clean run per condition.
+2. Record a verdict in `reviews.csv`. Mark a run `invalid` if it broke the rules, for example by reading test data.
+3. Report results with invalid runs excluded, and say how many were excluded.
+
+To keep results across machines, copy back from the cluster whatever you want to keep. Everything except `edits/` is
+small text.
+
+```bash
+rsync -av --exclude edits --exclude '*.incomplete-*' UWNetID@tillicum.hyak.uw.edu:/gpfs/projects/GROUP/wp/runs/ runs/
+```
+
+To see the page with made-up results first:
+
+```bash
+python examples/make_demo.py && python analysis/review.py --runs examples/demo/runs
+```
+
+## 8. Deviations from the approved plan
 
 - **IFEval is not in the general panel.** Its official checkers need extra packages; GSM8K, MMLU-Pro and the
   side-effect score cover math, knowledge and fluency.
@@ -286,7 +331,7 @@ the cells will be recomputed.
 - **The rules are for a cooperative agent.** The sandbox blocks the network and limits file writes, but the agent's
   Python could still bypass the pass counter or read test files. E5 needs the stricter harness planned as H5.
 
-## 8. Where the methods come from
+## 9. Where the methods come from
 
 | Method | Source |
 |---|---|
