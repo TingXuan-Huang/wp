@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Qwen Edit Layer Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: every chart shares one horizontal axis, the 24 layers of the model (0 on the left, 23 on the right).
+   First the concepts per task on that axis, then every run on it, each row opening into the agent's own account. */
+:root {
+  --bg: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --wash: #efeeea; --panel: #f4f3f0;
+  --seq: #2a78d6; --on-fill: #ffffff;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --gcols: 96px repeat(24, minmax(0, 1fr)) 58px 92px 178px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #4a4a46; --wash: #2a2a28; --panel: #232322;
+    --seq: #3987e5; --on-fill: #ffffff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #4a4a46; --wash: #2a2a28; --panel: #232322;
+  --seq: #3987e5; --on-fill: #ffffff; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.page {
+  max-width: 1080px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px;
+}
+h1, h2, h3, h4, p, ul { margin: 0; }
+h1 { font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; max-width: 22em; }
+h2 { font-size: 21px; line-height: 1.3; font-weight: 600; text-wrap: balance; max-width: 34em; }
+h3 { font-size: 17px; font-weight: 600; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h3 span { font-weight: 400; font-size: 13px; color: var(--muted); }
+h4 { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--ink2); max-width: 68ch; }
+.note { color: var(--ink2); font-size: 13px; max-width: 78ch; }
+code { font-family: var(--mono); font-size: 0.9em; }
+a { color: inherit; }
+header, section, .head { display: flex; flex-direction: column; }
+header { gap: 12px; } section { gap: 22px; } .head { gap: 6px; }
+
+/* the layer axis and strips */
+.strip, .lax { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); column-gap: 2px; }
+.strip span { height: 22px; border-radius: 2px; background: var(--wash); font-size: 11px; line-height: 22px; text-align: center; font-variant-numeric: tabular-nums; color: var(--ink); cursor: default; overflow: hidden; }
+.strip span.on { color: var(--on-fill); }
+.lax span { height: 15px; margin-top: 3px; border-top: 2px solid transparent; font-size: 10px; line-height: 13px; color: var(--muted); display: flex; justify-content: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lax span.full { border-top-color: var(--ink2); }
+
+/* concepts per task */
+.tasks { display: flex; flex-direction: column; gap: 40px; }
+.task { display: flex; flex-direction: column; gap: 14px; }
+.crow { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 8px 28px; align-items: start; }
+.crow .txt { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.crow .txt b { font-weight: 600; }
+.crow .txt p { font-size: 13px; color: var(--ink2); line-height: 1.45; }
+.crow.all .txt b { font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.chip { font: inherit; font-size: 12px; font-family: var(--mono); color: var(--ink2); background: var(--panel); border: 1px solid var(--grid); border-radius: 4px; padding: 1px 7px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip:hover { border-color: var(--ink2); color: var(--ink); }
+.chip:focus-visible, .runrow:focus-visible { outline: 2px solid var(--seq); outline-offset: 1px; }
+
+/* legend */
+.key { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--ink2); align-items: center; }
+.key > span { display: inline-flex; align-items: center; gap: 7px; }
+.kcell { display: inline-grid; grid-template-rows: 9px 9px; row-gap: 1px; width: 18px; }
+.kcell i, .cell i { display: block; background: var(--wash); border-radius: 1.5px; }
+.kramp { width: 70px; height: 10px; border-radius: 2px; background: linear-gradient(to right, color-mix(in oklab, var(--seq) 30%, var(--bg)), var(--seq)); }
+.ktick { width: 18px; border-top: 2px solid var(--ink2); }
+i.loc { box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+/* run grid */
+.group { display: flex; flex-direction: column; gap: 1px; }
+.ghead { display: grid; grid-template-columns: var(--gcols); column-gap: 2px; align-items: end; padding: 0 6px; font-size: 11px; color: var(--muted); }
+.ghead .lax { grid-column: 2 / span 24; }
+.ghead .t { font-size: 15px; font-weight: 600; color: var(--ink); align-self: center; }
+.ghead .r { text-align: right; padding-bottom: 2px; }
+.ghead .c { padding: 0 0 2px 14px; }
+.runrow { font: inherit; color: inherit; background: none; border: 0; margin: 0; width: 100%; text-align: left; cursor: pointer; display: grid; grid-template-columns: var(--gcols); column-gap: 2px; align-items: center; padding: 3px 6px; border-radius: 4px; }
+.runrow:hover, .runrow[aria-expanded="true"] { background: var(--panel); }
+.runrow .lab { font-size: 13px; color: var(--ink2); white-space: nowrap; }
+.runrow[aria-expanded="true"] .lab { color: var(--ink); font-weight: 600; }
+.runrow .g { text-align: right; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.runrow .w { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.runrow .ct { font-size: 12px; color: var(--ink2); padding-left: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell { display: grid; grid-template-rows: 9px 9px; row-gap: 1px; }
+.sep { height: 7px; }
+
+/* opened run */
+.detail { background: var(--panel); border-radius: 6px; padding: 18px 20px 20px; margin: 2px 0 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 36px; font-size: 13.5px; }
+.detail .wide { grid-column: 1 / -1; }
+.detail .blk { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.detail .title { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.detail .title b { font-family: var(--mono); font-weight: 500; font-size: 14px; }
+.detail .title span { color: var(--ink2); font-variant-numeric: tabular-nums; }
+.detail p { color: var(--ink); max-width: 68ch; }
+.detail p.sub { color: var(--ink2); font-size: 12.5px; }
+.detail ul { padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }
+.detail table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.detail th { text-align: left; font-weight: 500; color: var(--muted); padding: 2px 10px 4px 0; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.detail td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+.detail td:last-child, .detail th:last-child { padding-right: 0; }
+.detail td.n, .detail th.n { text-align: right; white-space: nowrap; }
+.detail td.m { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.tscroll { overflow: auto; max-height: 290px; min-width: 0; }
+
+#tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px; max-width: 290px; }
+#tip b { font-weight: 600; }
+footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--grid); padding-top: 16px; max-width: 90ch; }
+
+@media (max-width: 860px) {
+  :root { --gcols: 72px repeat(24, minmax(0, 1fr)) 42px; }
+  h1 { font-size: 26px; }
+  .page { gap: 44px; padding-block: 24px 56px; }
+  .crow { grid-template-columns: minmax(0, 1fr); }
+  .strip, .lax, .runrow, .ghead { column-gap: 1px; }
+  .strip span { font-size: 0; height: 18px; }
+  .runrow, .ghead { padding-left: 0; padding-right: 0; }
+  .runrow .w, .runrow .ct, .ghead .w, .ghead .c { display: none; }
+  .runrow .lab { font-size: 12px; }
+  .detail { grid-template-columns: minmax(0, 1fr); padding: 14px 12px 16px; }
+}
+</style>
+
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow">wp-klone · Qwen3.5-0.8B · E1 and E2</div>
+    <h1>Which layers did the edits touch, and what was each one testing?</h1>
+    <p class="lede">Qwen3.5-0.8B has 24 layers, numbered 0 to 23. Each layer has an attention block and an MLP. Layers 3, 7, 11, 15, 19 and 23 use full attention; the others use linear attention (Gated DeltaNet). Every chart below runs across those 24 layers, input side on the left.</p>
+    <p class="note">The results folder holds two kinds of layer evidence: which weights each run changed (measured in E2), and where each agent's own tests placed the behaviour (from its written summary). It holds no raw activation recordings, so "active" here means located by the agent's probes, attribution, steering or patching. Companion to the <a href="overview.html">results overview</a>.</p>
+  </header>
+
+  <section id="concepts">
+    <div class="head">
+      <h2>Each task came down to one or two concepts, and each concept has a home in the network.</h2>
+      <p class="note">A number is how many of the six agent runs for that task changed weights in that layer. The tick marks under the strip are the full-attention layers. Click a run to open its account further down.</p>
+    </div>
+    <div class="tasks" id="taskBlocks"></div>
+  </section>
+
+  <section id="runs">
+    <div class="head">
+      <h2>Every run, layer by layer. Click a row for what the agent tested.</h2>
+      <p class="note">Gain is the test-set gain from E1, in points. Random edits are left out: each one changes the same tensors as the basic agent run it is matched to.</p>
+    </div>
+    <div class="key">
+      <span><span class="kcell"><i style="background:var(--seq)"></i><i></i></span>top half: attention weights</span>
+      <span><span class="kcell"><i></i><i style="background:var(--seq)"></i></span>bottom half: MLP weights</span>
+      <span><span class="kramp"></span>edited; darker is a larger change relative to the tensor (‖Δ‖/‖W‖)</span>
+      <span><span class="kcell"><i class="loc"></i><i class="loc"></i></span>outlined: where the agent's tests located the behaviour</span>
+      <span><span class="ktick"></span>full-attention layer</span>
+    </div>
+    <div id="grid"></div>
+  </section>
+
+  <footer>Sources: <code>e2/&lt;run&gt;/summary.json</code> for the weights changed per tensor, their size, rank and the gain of each tensor alone; <code>e1/report.csv</code> for test gains; <code>e1/per_run/&lt;run&gt;/final_answer.md</code> for each agent's concept, localisation, tests and rejected edits. The agent accounts are condensed from those summaries, and their numbers are the agents' own measurements on small practice and select samples, not the E1 test sets.</footer>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const DATA = {"e1":{"addition-agent_basic-r1":{"v":22.6,"ci":"+18.2 to +27.0"},"addition-agent_basic-r2":{"v":4.8,"ci":"+2.6 to +7.2"},"addition-agent_basic-r3":{"v":2.2,"ci":"−0.4 to +5.0"},"addition-agent_interp-r1":{"v":5.2,"ci":"+2.4 to +7.8"},"addition-agent_interp-r2":{"v":5.2,"ci":"+2.4 to +7.8"},"addition-agent_interp-r3":{"v":5.4,"ci":"+2.6 to +8.4"},"addition-finetune-r0":{"v":31.4,"ci":"+26.8 to +36.0"},"addition-finetune-r1":{"v":9.6,"ci":"+6.2 to +12.8"},"addition-random-r1":{"v":-1.0,"ci":"−2.4 to +0.4"},"addition-random-r2":{"v":-0.6,"ci":"−1.6 to +0.2"},"addition-random-r3":{"v":1.8,"ci":"+0.2 to +3.4"},"facts-agent_basic-r1":{"v":28.6,"ci":"+18.6 to +40.0"},"facts-agent_basic-r2":{"v":15.7,"ci":"+7.1 to +24.3"},"facts-agent_basic-r3":{"v":20.0,"ci":"+11.4 to +30.0"},"facts-agent_interp-r1":{"v":24.3,"ci":"+12.9 to +37.1"},"facts-agent_interp-r2":{"v":12.9,"ci":"+5.7 to +21.4"},"facts-agent_interp-r3":{"v":8.6,"ci":"−1.4 to +18.6"},"facts-finetune-r0":{"v":-24.3,"ci":"−42.9 to −4.3"},"facts-finetune-r1":{"v":-28.6,"ci":"−47.1 to −8.6"},"facts-random-r1":{"v":4.3,"ci":"+0.0 to +8.6"},"facts-random-r2":{"v":1.4,"ci":"+0.0 to +4.3"},"facts-random-r3":{"v":0.0,"ci":"+0.0 to +0.0"},"loops-agent_basic-r1":{"v":35.4,"ci":"+31.0 to +40.0"},"loops-agent_basic-r2":{"v":20.4,"ci":"+16.4 to +24.2"},"loops-agent_basic-r3":{"v":20.4,"ci":"+16.4 to +24.2"},"loops-agent_interp-r1":{"v":50.0,"ci":"+45.4 to +54.4"},"loops-agent_interp-r2":{"v":42.2,"ci":"+37.8 to +46.6"},"loops-agent_interp-r3":{"v":49.8,"ci":"+45.0 to +54.4"},"loops-direction-r1":{"v":7.6,"ci":"+4.0 to +11.6"},"loops-finetune-r0":{"v":27.0,"ci":"+22.6 to +31.2"},"loops-finetune-r1":{"v":23.2,"ci":"+18.8 to +27.4"},"loops-random-r1":{"v":0.4,"ci":""},"loops-random-r2":{"v":1.0,"ci":"−2.0 to +4.2"},"loops-random-r3":{"v":0.8,"ci":"−2.4 to +3.8"},"markdown-agent_basic-r1":{"v":84.8,"ci":"+81.6 to +87.8"},"markdown-agent_basic-r2":{"v":90.2,"ci":"+87.4 to +92.8"},"markdown-agent_basic-r3":{"v":84.8,"ci":"+81.6 to +87.8"},"markdown-agent_interp-r1":{"v":66.4,"ci":"+62.2 to +70.4"},"markdown-agent_interp-r2":{"v":63.8,"ci":"+59.6 to +68.0"},"markdown-agent_interp-r3":{"v":58.2,"ci":"+53.8 to +62.4"},"markdown-direction-r1":{"v":5.4,"ci":"+3.4 to +7.4"},"markdown-finetune-r0":{"v":93.0,"ci":"+90.4 to +95.2"},"markdown-finetune-r1":{"v":80.4,"ci":"+77.0 to +83.8"},"markdown-random-r1":{"v":-0.2,"ci":"−0.6 to +0.0"},"markdown-random-r2":{"v":-0.2,"ci":"−0.6 to +0.0"},"markdown-random-r3":{"v":0.0,"ci":"−0.6 to +0.6"}},"e2":{"addition-agent_basic-r1":{"task":"addition","cond":"agent_basic","rep":"r1","w":3071,"gain":23.3,"tensors":[{"n":"mlp.gate_proj","l":23,"c":"mlp_in","ch":1023,"norm":0.1589,"touch":[1,3584,"rows"],"rank":1,"alone":-0.3},{"n":"mlp.up_proj","l":23,"c":"mlp_in","ch":1024,"norm":0.0189,"touch":[1,3584,"rows"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":1024,"norm":0.0232,"touch":[1,3584,"cols"],"rank":1,"alone":0.0}]},"addition-agent_basic-r2":{"task":"addition","cond":"agent_basic","rep":"r2","w":10240,"gain":3.3,"tensors":[{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":10240,"norm":0.0232,"touch":[10,3584,"cols"],"rank":10,"alone":null}]},"addition-agent_basic-r3":{"task":"addition","cond":"agent_basic","rep":"r3","w":33775,"gain":0.0,"tensors":[{"n":"mlp.gate_proj","l":23,"c":"mlp_in","ch":11258,"norm":0.1761,"touch":[11,3584,"rows"],"rank":8,"alone":null},{"n":"mlp.up_proj","l":23,"c":"mlp_in","ch":11254,"norm":0.2037,"touch":[11,3584,"rows"],"rank":10,"alone":null},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":11263,"norm":0.0562,"touch":[11,3584,"cols"],"rank":11,"alone":null}]},"addition-agent_interp-r1":{"task":"addition","cond":"agent_interp","rep":"r1","w":10240,"gain":4.0,"tensors":[{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":10240,"norm":0.0463,"touch":[10,3584,"cols"],"rank":10,"alone":null}]},"addition-agent_interp-r2":{"task":"addition","cond":"agent_interp","rep":"r2","w":10240,"gain":4.0,"tensors":[{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":10240,"norm":0.0463,"touch":[10,3584,"cols"],"rank":10,"alone":null}]},"addition-agent_interp-r3":{"task":"addition","cond":"agent_interp","rep":"r3","w":13290,"gain":3.7,"tensors":[{"n":"mlp.gate_proj","l":23,"c":"mlp_in","ch":1024,"norm":0.1399,"touch":[1,3584,"rows"],"rank":1,"alone":0.0},{"n":"mlp.up_proj","l":23,"c":"mlp_in","ch":1024,"norm":0.0174,"touch":[1,3584,"rows"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":11242,"norm":0.0377,"touch":[11,3584,"cols"],"rank":10,"alone":4.0}]},"addition-finetune-r0":{"task":"addition","cond":"finetune","rep":"r0","w":27733786,"gain":31.3,"tensors":[{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3468228,"norm":0.0318,"touch":[3584,3584,"cols"],"rank":618,"alone":27.0},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3463101,"norm":0.0294,"touch":[3584,3584,"cols"],"rank":644,"alone":23.0},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3471911,"norm":0.0305,"touch":[3584,3584,"cols"],"rank":651,"alone":22.7},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":3464713,"norm":0.0292,"touch":[3584,3584,"cols"],"rank":653,"alone":19.7},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3466668,"norm":0.0299,"touch":[3584,3584,"cols"],"rank":642,"alone":18.7},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3465476,"norm":0.0308,"touch":[3584,3584,"cols"],"rank":650,"alone":8.3},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3456132,"norm":0.0298,"touch":[3584,3584,"cols"],"rank":668,"alone":-2.3},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3477557,"norm":0.0315,"touch":[3584,3584,"cols"],"rank":702,"alone":2.3}]},"addition-finetune-r1":{"task":"addition","cond":"finetune","rep":"r1","w":10411525,"gain":8.0,"tensors":[{"n":"mlp.gate_proj","l":23,"c":"mlp_in","ch":3444056,"norm":0.0279,"touch":[1024,1024,"cols"],"rank":403,"alone":2.7},{"n":"mlp.up_proj","l":23,"c":"mlp_in","ch":3496034,"norm":0.0401,"touch":[1024,1024,"cols"],"rank":260,"alone":5.3},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":3471435,"norm":0.0387,"touch":[3584,3584,"cols"],"rank":90,"alone":4.7}]},"facts-agent_basic-r1":{"task":"facts","cond":"agent_basic","rep":"r1","w":28878783,"gain":8.3,"tensors":[{"n":"mlp.down_proj","l":3,"c":"mlp_out","ch":3583191,"norm":0.1437,"touch":[3584,3584,"cols"],"rank":8,"alone":0.0},{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":3590924,"norm":0.1573,"touch":[3584,3584,"cols"],"rank":8,"alone":1.7},{"n":"mlp.down_proj","l":5,"c":"mlp_out","ch":3603094,"norm":0.186,"touch":[3584,3584,"cols"],"rank":9,"alone":1.7},{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":3602910,"norm":0.1902,"touch":[3584,3584,"cols"],"rank":9,"alone":1.7},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":3615068,"norm":0.2241,"touch":[3584,3584,"cols"],"rank":9,"alone":0.0},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3623531,"norm":0.2686,"touch":[3584,3584,"cols"],"rank":9,"alone":-1.7},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3630164,"norm":0.3073,"touch":[3584,3584,"cols"],"rank":9,"alone":0.0},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3629901,"norm":0.3132,"touch":[3584,3584,"cols"],"rank":9,"alone":-1.7}]},"facts-agent_basic-r2":{"task":"facts","cond":"agent_basic","rep":"r2","w":18176582,"gain":6.7,"tensors":[{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":3622494,"norm":0.2277,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":3631261,"norm":0.2736,"touch":[3584,3584,"cols"],"rank":10,"alone":0.0},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3639522,"norm":0.3401,"touch":[3584,3584,"cols"],"rank":10,"alone":3.3},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3642057,"norm":0.3756,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3641248,"norm":0.361,"touch":[3584,3584,"cols"],"rank":10,"alone":0.0}]},"facts-agent_basic-r3":{"task":"facts","cond":"agent_basic","rep":"r3","w":10825815,"gain":8.3,"tensors":[{"n":"mlp.down_proj","l":2,"c":"mlp_out","ch":3608647,"norm":0.1417,"touch":[3584,3584,"cols"],"rank":10,"alone":3.3},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3627260,"norm":0.1982,"touch":[3584,3584,"cols"],"rank":10,"alone":0.0},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3589908,"norm":0.1028,"touch":[3584,3584,"cols"],"rank":10,"alone":0.0}]},"facts-agent_interp-r1":{"task":"facts","cond":"agent_interp","rep":"r1","w":14395520,"gain":11.7,"tensors":[{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":3611722,"norm":0.1767,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":3607399,"norm":0.1669,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":3599614,"norm":0.162,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":3576785,"norm":0.1471,"touch":[3584,3584,"cols"],"rank":10,"alone":1.7}]},"facts-agent_interp-r2":{"task":"facts","cond":"agent_interp","rep":"r2","w":82899,"gain":5.0,"tensors":[{"n":"mlp.gate_proj","l":4,"c":"mlp_in","ch":27644,"norm":0.578,"touch":[27,3584,"rows"],"rank":23,"alone":0.0},{"n":"mlp.up_proj","l":4,"c":"mlp_in","ch":27631,"norm":0.0877,"touch":[27,3584,"rows"],"rank":27,"alone":0.0},{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":27624,"norm":0.1758,"touch":[27,3584,"cols"],"rank":26,"alone":0.0}]},"facts-agent_interp-r3":{"task":"facts","cond":"agent_interp","rep":"r3","w":1551344,"gain":-6.7,"tensors":[{"n":"linear_attn.in_proj_qkv","l":20,"c":"attn_in","ch":1551344,"norm":0.4419,"touch":[1536,6144,"rows"],"rank":10,"alone":null}]},"facts-finetune-r0":{"task":"facts","cond":"finetune","rep":"r0","w":27845298,"gain":-51.7,"tensors":[{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3470701,"norm":0.0278,"touch":[3584,3584,"cols"],"rank":614,"alone":null},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3471437,"norm":0.0274,"touch":[3584,3584,"cols"],"rank":613,"alone":null},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3478600,"norm":0.028,"touch":[3584,3584,"cols"],"rank":596,"alone":null},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":3476897,"norm":0.0276,"touch":[3584,3584,"cols"],"rank":604,"alone":null},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3483481,"norm":0.0284,"touch":[3584,3584,"cols"],"rank":606,"alone":null},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3487256,"norm":0.0289,"touch":[3584,3584,"cols"],"rank":595,"alone":null},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3491609,"norm":0.0294,"touch":[3584,3584,"cols"],"rank":575,"alone":null},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3485317,"norm":0.028,"touch":[3584,3584,"cols"],"rank":573,"alone":null}]},"facts-finetune-r1":{"task":"facts","cond":"finetune","rep":"r1","w":27755644,"gain":-50.0,"tensors":[{"n":"mlp.down_proj","l":3,"c":"mlp_out","ch":3462530,"norm":0.0257,"touch":[3584,3584,"cols"],"rank":697,"alone":null},{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":3464531,"norm":0.0259,"touch":[3584,3584,"cols"],"rank":683,"alone":null},{"n":"mlp.down_proj","l":5,"c":"mlp_out","ch":3465876,"norm":0.0261,"touch":[3584,3584,"cols"],"rank":675,"alone":null},{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":3466478,"norm":0.0265,"touch":[3584,3584,"cols"],"rank":652,"alone":null},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":3464969,"norm":0.0266,"touch":[3584,3584,"cols"],"rank":653,"alone":null},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3473318,"norm":0.0277,"touch":[3584,3584,"cols"],"rank":632,"alone":null},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3476135,"norm":0.0278,"touch":[3584,3584,"cols"],"rank":623,"alone":null},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3481807,"norm":0.0285,"touch":[3584,3584,"cols"],"rank":608,"alone":null}]},"loops-agent_basic-r1":{"task":"loops","cond":"agent_basic","rep":"r1","w":43742593,"gain":30.0,"tensors":[{"n":"linear_attn.out_proj","l":14,"c":"attn_out","ch":1742451,"norm":0.0215,"touch":[2048,2048,"cols"],"rank":2,"alone":-1.0},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3113266,"norm":0.0238,"touch":[3584,3584,"cols"],"rank":2,"alone":0.0},{"n":"self_attn.o_proj","l":15,"c":"attn_out","ch":1729124,"norm":0.0185,"touch":[2048,2048,"cols"],"rank":2,"alone":-1.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3062926,"norm":0.021,"touch":[3584,3584,"cols"],"rank":2,"alone":1.0},{"n":"linear_attn.out_proj","l":16,"c":"attn_out","ch":1773753,"norm":0.023,"touch":[2048,2048,"cols"],"rank":2,"alone":3.0},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":3073924,"norm":0.0207,"touch":[3584,3584,"cols"],"rank":2,"alone":4.0},{"n":"linear_attn.out_proj","l":17,"c":"attn_out","ch":1785544,"norm":0.0231,"touch":[2048,2048,"cols"],"rank":2,"alone":1.0},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":3068758,"norm":0.02,"touch":[3584,3584,"cols"],"rank":2,"alone":-3.0},{"n":"linear_attn.out_proj","l":18,"c":"attn_out","ch":1768853,"norm":0.0226,"touch":[2048,2048,"cols"],"rank":2,"alone":0.0},{"n":"mlp.down_proj","l":18,"c":"mlp_out","ch":3070774,"norm":0.0205,"touch":[3584,3584,"cols"],"rank":2,"alone":2.0},{"n":"self_attn.o_proj","l":19,"c":"attn_out","ch":1727658,"norm":0.0178,"touch":[2048,2048,"cols"],"rank":2,"alone":-2.0},{"n":"mlp.down_proj","l":19,"c":"mlp_out","ch":3058404,"norm":0.0199,"touch":[3584,3584,"cols"],"rank":2,"alone":-7.0},{"n":"linear_attn.out_proj","l":20,"c":"attn_out","ch":1777670,"norm":0.0257,"touch":[2048,2048,"cols"],"rank":2,"alone":-4.0},{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":3084093,"norm":0.0206,"touch":[3584,3584,"cols"],"rank":2,"alone":0.0},{"n":"linear_attn.out_proj","l":21,"c":"attn_out","ch":1821126,"norm":0.0233,"touch":[2048,2048,"cols"],"rank":2,"alone":-4.0},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":3137637,"norm":0.0216,"touch":[3584,3584,"cols"],"rank":2,"alone":1.0},{"n":"linear_attn.out_proj","l":22,"c":"attn_out","ch":1807948,"norm":0.0234,"touch":[2048,2048,"cols"],"rank":2,"alone":-2.0},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":3138684,"norm":0.0217,"touch":[3584,3584,"cols"],"rank":2,"alone":2.0}]},"loops-agent_basic-r2":{"task":"loops","cond":"agent_basic","rep":"r2","w":1024,"gain":13.0,"tensors":[{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":1024,"norm":0.0163,"touch":[1,3584,"cols"],"rank":1,"alone":null}]},"loops-agent_basic-r3":{"task":"loops","cond":"agent_basic","rep":"r3","w":1024,"gain":13.0,"tensors":[{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":1024,"norm":0.0163,"touch":[1,3584,"cols"],"rank":1,"alone":null}]},"loops-agent_interp-r1":{"task":"loops","cond":"agent_interp","rep":"r1","w":2047,"gain":40.0,"tensors":[{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":2047,"norm":0.0514,"touch":[2,3584,"cols"],"rank":1,"alone":null}]},"loops-agent_interp-r2":{"task":"loops","cond":"agent_interp","rep":"r2","w":2046,"gain":32.0,"tensors":[{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":2046,"norm":0.0603,"touch":[2,3584,"cols"],"rank":1,"alone":null}]},"loops-agent_interp-r3":{"task":"loops","cond":"agent_interp","rep":"r3","w":28083116,"gain":39.0,"tensors":[{"n":"linear_attn.out_proj","l":12,"c":"attn_out","ch":1734408,"norm":0.0329,"touch":[2048,2048,"cols"],"rank":1,"alone":3.0},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3006750,"norm":0.034,"touch":[3584,3584,"cols"],"rank":1,"alone":-1.0},{"n":"linear_attn.out_proj","l":13,"c":"attn_out","ch":1711447,"norm":0.0323,"touch":[2048,2048,"cols"],"rank":1,"alone":3.0},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3028266,"norm":0.0333,"touch":[3583,3584,"cols"],"rank":1,"alone":-2.0},{"n":"linear_attn.out_proj","l":14,"c":"attn_out","ch":1717187,"norm":0.0324,"touch":[2048,2048,"cols"],"rank":1,"alone":3.0},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3031051,"norm":0.0354,"touch":[3584,3584,"cols"],"rank":1,"alone":-1.0},{"n":"self_attn.o_proj","l":15,"c":"attn_out","ch":1678560,"norm":0.0275,"touch":[2048,2048,"cols"],"rank":1,"alone":15.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":2949272,"norm":0.0296,"touch":[3584,3584,"cols"],"rank":1,"alone":6.0},{"n":"linear_attn.out_proj","l":16,"c":"attn_out","ch":1700884,"norm":0.0333,"touch":[2048,2048,"cols"],"rank":1,"alone":10.0},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":2930079,"norm":0.0285,"touch":[3584,3584,"cols"],"rank":1,"alone":4.0},{"n":"linear_attn.out_proj","l":17,"c":"attn_out","ch":1687120,"norm":0.0327,"touch":[2048,2048,"cols"],"rank":1,"alone":6.0},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":2908092,"norm":0.0268,"touch":[3582,3584,"cols"],"rank":1,"alone":7.0}]},"loops-direction-r1":{"task":"loops","cond":"direction","rep":"r1","w":115656452,"gain":4.0,"tensors":[{"n":"linear_attn.out_proj","l":0,"c":"attn_out","ch":1823963,"norm":0.0675,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":0,"c":"mlp_out","ch":3108543,"norm":0.0499,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":1,"c":"attn_out","ch":1822692,"norm":0.1,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":1,"c":"mlp_out","ch":3062589,"norm":0.0493,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":2,"c":"attn_out","ch":1785880,"norm":0.0681,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":2,"c":"mlp_out","ch":3128176,"norm":0.0514,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":3,"c":"attn_out","ch":1820477,"norm":0.0531,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":3,"c":"mlp_out","ch":3024651,"norm":0.0445,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":4,"c":"attn_out","ch":1793645,"norm":0.057,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":3039905,"norm":0.0417,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":5,"c":"attn_out","ch":1778844,"norm":0.0466,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":5,"c":"mlp_out","ch":3049327,"norm":0.0445,"touch":[3582,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":6,"c":"attn_out","ch":1760102,"norm":0.0442,"touch":[2047,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":3022001,"norm":0.0377,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":7,"c":"attn_out","ch":1769886,"norm":0.0424,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":3090107,"norm":0.0475,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":8,"c":"attn_out","ch":1776881,"norm":0.0478,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3057250,"norm":0.0431,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":9,"c":"attn_out","ch":1809102,"norm":0.0472,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3071172,"norm":0.0465,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":10,"c":"attn_out","ch":1754310,"norm":0.041,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3118850,"norm":0.0467,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":11,"c":"attn_out","ch":1755711,"norm":0.0401,"touch":[2047,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":3094914,"norm":0.0463,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":12,"c":"attn_out","ch":1762371,"norm":0.0423,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3059267,"norm":0.0402,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":13,"c":"attn_out","ch":1735081,"norm":0.0396,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3038547,"norm":0.0402,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":14,"c":"attn_out","ch":1750531,"norm":0.0399,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3082781,"norm":0.0436,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":15,"c":"attn_out","ch":1735727,"norm":0.0356,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3064690,"norm":0.0401,"touch":[3583,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":16,"c":"attn_out","ch":1763076,"norm":0.0435,"touch":[1023,1024,"rows"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":3025041,"norm":0.0375,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":17,"c":"attn_out","ch":1753442,"norm":0.0426,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":3019552,"norm":0.0362,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":18,"c":"attn_out","ch":1763081,"norm":0.0472,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":18,"c":"mlp_out","ch":3008889,"norm":0.0367,"touch":[3582,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":19,"c":"attn_out","ch":1724817,"norm":0.0371,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":19,"c":"mlp_out","ch":3017035,"norm":0.037,"touch":[3583,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":20,"c":"attn_out","ch":1741084,"norm":0.0433,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":2978760,"norm":0.0349,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":21,"c":"attn_out","ch":1740286,"norm":0.0395,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":3020963,"norm":0.0349,"touch":[3583,3584,"cols"],"rank":1,"alone":null},{"n":"linear_attn.out_proj","l":22,"c":"attn_out","ch":1741941,"norm":0.0415,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":3014559,"norm":0.0372,"touch":[3584,3584,"cols"],"rank":1,"alone":null},{"n":"self_attn.o_proj","l":23,"c":"attn_out","ch":1756784,"norm":0.0386,"touch":[2048,2048,"cols"],"rank":1,"alone":null},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":3039169,"norm":0.0429,"touch":[3583,3584,"cols"],"rank":1,"alone":null}]},"loops-finetune-r0":{"task":"loops","cond":"finetune","rep":"r0","w":28160996,"gain":20.0,"tensors":[{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3514688,"norm":0.04,"touch":[3584,3584,"cols"],"rank":880,"alone":12.0},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3513212,"norm":0.0396,"touch":[3584,3584,"cols"],"rank":884,"alone":11.0},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3514779,"norm":0.0403,"touch":[3584,3584,"cols"],"rank":878,"alone":10.0},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":3517996,"norm":0.0409,"touch":[3584,3584,"cols"],"rank":887,"alone":18.0},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3524731,"norm":0.0427,"touch":[3584,3584,"cols"],"rank":890,"alone":0.0},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3525984,"norm":0.0427,"touch":[3584,3584,"cols"],"rank":886,"alone":4.0},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3529346,"norm":0.0435,"touch":[3584,3584,"cols"],"rank":879,"alone":-5.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3520260,"norm":0.041,"touch":[3584,3584,"cols"],"rank":870,"alone":-11.0}]},"loops-finetune-r1":{"task":"loops","cond":"finetune","rep":"r1","w":48955694,"gain":22.0,"tensors":[{"n":"linear_attn.out_proj","l":14,"c":"attn_out","ch":1990028,"norm":0.0313,"touch":[2048,2048,"cols"],"rank":789,"alone":11.0},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3522167,"norm":0.0415,"touch":[3584,3584,"cols"],"rank":872,"alone":13.0},{"n":"self_attn.o_proj","l":15,"c":"attn_out","ch":1941747,"norm":0.023,"touch":[2048,2048,"cols"],"rank":719,"alone":6.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3497085,"norm":0.036,"touch":[3584,3584,"cols"],"rank":878,"alone":7.0},{"n":"linear_attn.out_proj","l":16,"c":"attn_out","ch":1972723,"norm":0.0287,"touch":[2048,2048,"cols"],"rank":801,"alone":0.0},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":3486303,"norm":0.0348,"touch":[3584,3584,"cols"],"rank":880,"alone":3.0},{"n":"linear_attn.out_proj","l":17,"c":"attn_out","ch":1968085,"norm":0.0285,"touch":[2048,2048,"cols"],"rank":815,"alone":-3.0},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":3482842,"norm":0.0346,"touch":[3584,3584,"cols"],"rank":880,"alone":-2.0},{"n":"linear_attn.out_proj","l":18,"c":"attn_out","ch":1972416,"norm":0.0295,"touch":[2048,2048,"cols"],"rank":815,"alone":2.0},{"n":"mlp.down_proj","l":18,"c":"mlp_out","ch":3485136,"norm":0.0348,"touch":[3584,3584,"cols"],"rank":876,"alone":-5.0},{"n":"self_attn.o_proj","l":19,"c":"attn_out","ch":1910767,"norm":0.019,"touch":[2048,2048,"cols"],"rank":729,"alone":-6.0},{"n":"mlp.down_proj","l":19,"c":"mlp_out","ch":3471026,"norm":0.0327,"touch":[3584,3584,"cols"],"rank":872,"alone":-6.0},{"n":"linear_attn.out_proj","l":20,"c":"attn_out","ch":1965509,"norm":0.0283,"touch":[2048,2048,"cols"],"rank":810,"alone":-1.0},{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":3466679,"norm":0.0321,"touch":[3584,3584,"cols"],"rank":868,"alone":0.0},{"n":"linear_attn.out_proj","l":21,"c":"attn_out","ch":1953521,"norm":0.0256,"touch":[2048,2048,"cols"],"rank":808,"alone":-7.0},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":3466488,"norm":0.0317,"touch":[3584,3584,"cols"],"rank":856,"alone":3.0},{"n":"linear_attn.out_proj","l":22,"c":"attn_out","ch":1948406,"norm":0.0244,"touch":[2048,2048,"cols"],"rank":776,"alone":-5.0},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":3454766,"norm":0.0303,"touch":[3584,3584,"cols"],"rank":825,"alone":-10.0}]},"markdown-agent_basic-r1":{"task":"markdown","cond":"agent_basic","rep":"r1","w":3370128,"gain":86.3,"tensors":[{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3370128,"norm":0.1221,"touch":[3584,3584,"cols"],"rank":1,"alone":null}]},"markdown-agent_basic-r2":{"task":"markdown","cond":"agent_basic","rep":"r2","w":40642076,"gain":94.0,"tensors":[{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":2076743,"norm":0.0083,"touch":[1022,1024,"rows"],"rank":286,"alone":0.0},{"n":"mlp.down_proj","l":5,"c":"mlp_out","ch":2159991,"norm":0.0086,"touch":[3581,3584,"cols"],"rank":276,"alone":0.0},{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":1943194,"norm":0.0112,"touch":[3583,3584,"cols"],"rank":77,"alone":0.0},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":2710797,"norm":0.0178,"touch":[3584,3584,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":2263921,"norm":0.01,"touch":[3582,3584,"cols"],"rank":205,"alone":0.0},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":2653471,"norm":0.0177,"touch":[3583,3584,"cols"],"rank":1,"alone":0.7},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":2241255,"norm":0.0118,"touch":[3581,3584,"cols"],"rank":91,"alone":-0.3},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":2227561,"norm":0.0114,"touch":[3582,3584,"cols"],"rank":112,"alone":0.0},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":2579131,"norm":0.0191,"touch":[3582,3584,"cols"],"rank":1,"alone":1.3},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":2641180,"norm":0.0273,"touch":[3584,3584,"cols"],"rank":1,"alone":11.3},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":2060950,"norm":0.0118,"touch":[3581,3584,"cols"],"rank":39,"alone":-0.3},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":2000444,"norm":0.009,"touch":[3582,3584,"cols"],"rank":202,"alone":0.0},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":1877487,"norm":0.0077,"touch":[3583,3584,"cols"],"rank":261,"alone":-0.3},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":2336619,"norm":0.0128,"touch":[3582,3584,"cols"],"rank":46,"alone":0.0},{"n":"mlp.down_proj","l":18,"c":"mlp_out","ch":1336117,"norm":0.0053,"touch":[3578,3584,"cols"],"rank":285,"alone":0.7},{"n":"mlp.down_proj","l":19,"c":"mlp_out","ch":933706,"norm":0.0043,"touch":[3581,3584,"cols"],"rank":213,"alone":0.0},{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":1877765,"norm":0.008,"touch":[3583,3584,"cols"],"rank":260,"alone":0.0},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":1644592,"norm":0.0087,"touch":[3577,3584,"cols"],"rank":150,"alone":0.0},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":971774,"norm":0.0044,"touch":[3572,3584,"cols"],"rank":224,"alone":0.3},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":2105378,"norm":0.0234,"touch":[3581,3584,"cols"],"rank":1,"alone":15.3}]},"markdown-agent_basic-r3":{"task":"markdown","cond":"agent_basic","rep":"r3","w":8451315,"gain":86.0,"tensors":[{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":2831042,"norm":0.0346,"touch":[3584,3584,"cols"],"rank":1,"alone":6.0},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":2765909,"norm":0.0384,"touch":[3584,3584,"cols"],"rank":1,"alone":16.3},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":2854364,"norm":0.0278,"touch":[3583,3584,"cols"],"rank":1,"alone":0.0}]},"markdown-agent_interp-r1":{"task":"markdown","cond":"agent_interp","rep":"r1","w":1024,"gain":69.0,"tensors":[{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":1024,"norm":0.4749,"touch":[1,3584,"cols"],"rank":1,"alone":null}]},"markdown-agent_interp-r2":{"task":"markdown","cond":"agent_interp","rep":"r2","w":7164,"gain":63.7,"tensors":[{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":2048,"norm":0.0753,"touch":[2,3584,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":5116,"norm":0.3056,"touch":[5,3584,"cols"],"rank":2,"alone":63.7}]},"markdown-agent_interp-r3":{"task":"markdown","cond":"agent_interp","rep":"r3","w":6765132,"gain":58.3,"tensors":[{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3431305,"norm":0.1309,"touch":[3584,3584,"cols"],"rank":1,"alone":6.3},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":3333827,"norm":0.079,"touch":[3584,3584,"cols"],"rank":1,"alone":19.7}]},"markdown-direction-r1":{"task":"markdown","cond":"direction","rep":"r1","w":106201894,"gain":6.7,"tensors":[{"n":"linear_attn.out_proj","l":0,"c":"attn_out","ch":1666810,"norm":0.0299,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":0,"c":"mlp_out","ch":2837045,"norm":0.0274,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":1,"c":"attn_out","ch":1635513,"norm":0.0293,"touch":[2048,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":1,"c":"mlp_out","ch":2788010,"norm":0.025,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":2,"c":"attn_out","ch":1628652,"norm":0.0298,"touch":[2048,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":2,"c":"mlp_out","ch":2719991,"norm":0.0232,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"self_attn.o_proj","l":3,"c":"attn_out","ch":1616592,"norm":0.028,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":3,"c":"mlp_out","ch":2716211,"norm":0.0238,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"linear_attn.out_proj","l":4,"c":"attn_out","ch":1633934,"norm":0.0297,"touch":[2048,2048,"cols"],"rank":1,"alone":0.7},{"n":"mlp.down_proj","l":4,"c":"mlp_out","ch":2756012,"norm":0.0247,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":5,"c":"attn_out","ch":1611774,"norm":0.0277,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":5,"c":"mlp_out","ch":2724609,"norm":0.0232,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"linear_attn.out_proj","l":6,"c":"attn_out","ch":1584038,"norm":0.0245,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":6,"c":"mlp_out","ch":2718529,"norm":0.0226,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"self_attn.o_proj","l":7,"c":"attn_out","ch":1538722,"norm":0.0213,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":7,"c":"mlp_out","ch":2772913,"norm":0.0233,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":8,"c":"attn_out","ch":1592563,"norm":0.0253,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":2759646,"norm":0.0245,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":9,"c":"attn_out","ch":1626143,"norm":0.0269,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":2765325,"norm":0.0245,"touch":[3583,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":10,"c":"attn_out","ch":1577885,"norm":0.0248,"touch":[2048,2048,"cols"],"rank":1,"alone":0.7},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":2798888,"norm":0.0256,"touch":[3584,3584,"cols"],"rank":1,"alone":0.7},{"n":"self_attn.o_proj","l":11,"c":"attn_out","ch":1550323,"norm":0.022,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":2779357,"norm":0.0249,"touch":[3584,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":12,"c":"attn_out","ch":1604877,"norm":0.0256,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":2800006,"norm":0.0257,"touch":[3583,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":13,"c":"attn_out","ch":1605486,"norm":0.0268,"touch":[2048,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":2805862,"norm":0.0267,"touch":[3584,3584,"cols"],"rank":1,"alone":0.7},{"n":"linear_attn.out_proj","l":14,"c":"attn_out","ch":1638399,"norm":0.0271,"touch":[2048,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":2885381,"norm":0.0288,"touch":[3582,3584,"cols"],"rank":1,"alone":0.3},{"n":"self_attn.o_proj","l":15,"c":"attn_out","ch":1612978,"norm":0.0249,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":2856053,"norm":0.0275,"touch":[3584,3584,"cols"],"rank":1,"alone":0.3},{"n":"linear_attn.out_proj","l":16,"c":"attn_out","ch":1625664,"norm":0.0277,"touch":[2047,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":16,"c":"mlp_out","ch":2830718,"norm":0.0267,"touch":[3582,3584,"cols"],"rank":1,"alone":0.7},{"n":"linear_attn.out_proj","l":17,"c":"attn_out","ch":1636816,"norm":0.0289,"touch":[2047,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":17,"c":"mlp_out","ch":2812822,"norm":0.0262,"touch":[3582,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":18,"c":"attn_out","ch":1612341,"norm":0.028,"touch":[2048,2048,"cols"],"rank":1,"alone":0.3},{"n":"mlp.down_proj","l":18,"c":"mlp_out","ch":2822635,"norm":0.0266,"touch":[3584,3584,"cols"],"rank":1,"alone":0.7},{"n":"self_attn.o_proj","l":19,"c":"attn_out","ch":1605479,"norm":0.0257,"touch":[2046,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":19,"c":"mlp_out","ch":2861073,"norm":0.0275,"touch":[3582,3584,"cols"],"rank":1,"alone":0.0},{"n":"linear_attn.out_proj","l":20,"c":"attn_out","ch":1637773,"norm":0.0293,"touch":[2047,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":20,"c":"mlp_out","ch":2861397,"norm":0.0272,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"linear_attn.out_proj","l":21,"c":"attn_out","ch":1641829,"norm":0.0284,"touch":[2048,2048,"cols"],"rank":1,"alone":-0.3},{"n":"mlp.down_proj","l":21,"c":"mlp_out","ch":2860313,"norm":0.0284,"touch":[3582,3584,"cols"],"rank":1,"alone":0.7},{"n":"linear_attn.out_proj","l":22,"c":"attn_out","ch":1647927,"norm":0.0293,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":22,"c":"mlp_out","ch":2885552,"norm":0.0291,"touch":[3584,3584,"cols"],"rank":1,"alone":-0.3},{"n":"self_attn.o_proj","l":23,"c":"attn_out","ch":1686178,"norm":0.0314,"touch":[2048,2048,"cols"],"rank":1,"alone":0.0},{"n":"mlp.down_proj","l":23,"c":"mlp_out","ch":2964850,"norm":0.0336,"touch":[3583,3584,"cols"],"rank":1,"alone":-0.3}]},"markdown-finetune-r0":{"task":"markdown","cond":"finetune","rep":"r0","w":28515354,"gain":93.7,"tensors":[{"n":"mlp.down_proj","l":8,"c":"mlp_out","ch":3564816,"norm":0.0603,"touch":[3584,3584,"cols"],"rank":922,"alone":0.0},{"n":"mlp.down_proj","l":9,"c":"mlp_out","ch":3562554,"norm":0.0584,"touch":[3584,3584,"cols"],"rank":924,"alone":0.3},{"n":"mlp.down_proj","l":10,"c":"mlp_out","ch":3562904,"norm":0.0589,"touch":[3584,3584,"cols"],"rank":922,"alone":0.0},{"n":"mlp.down_proj","l":11,"c":"mlp_out","ch":3562774,"norm":0.0587,"touch":[3584,3584,"cols"],"rank":925,"alone":0.0},{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3565621,"norm":0.0605,"touch":[3584,3584,"cols"],"rank":927,"alone":0.7},{"n":"mlp.down_proj","l":13,"c":"mlp_out","ch":3566590,"norm":0.0605,"touch":[3584,3584,"cols"],"rank":919,"alone":0.7},{"n":"mlp.down_proj","l":14,"c":"mlp_out","ch":3567815,"norm":0.0615,"touch":[3584,3584,"cols"],"rank":913,"alone":0.0},{"n":"mlp.down_proj","l":15,"c":"mlp_out","ch":3562280,"norm":0.0583,"touch":[3584,3584,"cols"],"rank":922,"alone":0.0}]},"markdown-finetune-r1":{"task":"markdown","cond":"finetune","rep":"r1","w":3602408,"gain":81.7,"tensors":[{"n":"mlp.down_proj","l":12,"c":"mlp_out","ch":3602408,"norm":0.0914,"touch":[3584,3584,"cols"],"rank":881,"alone":null}]}}};
+const E1 = DATA.e1, E2 = DATA.e2;
+const FULL = new Set([3, 7, 11, 15, 19, 23]);
+const TASKS = ['loops', 'markdown', 'facts', 'addition'];
+const TASK = {
+  loops:    { name: 'Loops',    orig: 9.2,  what: 'math problems where the model doubts itself until the 8,192-token limit',
+              all: 'All six runs trace the endless reasoning to one thing, a doubt signal that keeps restarting "Wait, …". Their edits sit in layers 12 to 22. None touches the early layers.' },
+  markdown: { name: 'Markdown', orig: 0.6,  what: 'answer in plain prose instead of markdown',
+              all: 'Five runs add the shift that an explicit "no markdown" instruction causes, mostly around layers 12 to 14. Three block markup tokens at the last MLPs.' },
+  facts:    { name: 'Facts',    orig: 61.4, what: 'make the model state rewritten facts',
+              all: 'The runs split. Four write a new identity into early and middle MLPs at the subject\'s tokens. Two change how the answer is read out in layers 20 to 23.' },
+  addition: { name: 'Addition', orig: 36.2, what: 'add 6 to 8 digit numbers',
+              all: 'Every run edits only the last MLP, layer 23. The agents found the digits are computed earlier, by the MLPs in layers 17 to 22, and that layer 23 then lowers confidence in them.' },
+};
+const CONCEPTS = {
+  loops: [
+    { short: 'doubt direction', name: 'A "doubt" direction in the residual stream',
+      desc: 'One direction separates the moments when the model is about to second-guess itself from the moments when it concludes. Pushing against it, or removing it from the layers that write it, lets the model reach its answer.',
+      uses: { 'loops-agent_basic-r1': null, 'loops-agent_interp-r1': null, 'loops-agent_interp-r2': null, 'loops-agent_interp-r3': null } },
+    { short: '"Wait" neuron', name: 'The "Wait" neuron (layer 16, neuron 998)',
+      desc: 'A single MLP neuron that turns a doubt signal into the word "Wait". Two independent runs found it and zeroed its one output column.',
+      uses: { 'loops-agent_basic-r2': null, 'loops-agent_basic-r3': null } },
+  ],
+  markdown: [
+    { short: 'prose instruction', name: 'The plain-prose instruction direction',
+      desc: 'The model already writes prose when told to. The agents measured how that instruction shifts the residual stream and added the same shift through MLP weights. Removing or flipping the direction did not work; it had to be added.',
+      uses: { 'markdown-agent_basic-r1': null, 'markdown-agent_basic-r2': [4, 22], 'markdown-agent_basic-r3': null, 'markdown-agent_interp-r1': null, 'markdown-agent_interp-r3': [14, 14] } },
+    { short: 'token suppression', name: 'Markup-token suppression at the output',
+      desc: 'Lower the logits of tokens that only serve as markdown (<code>**</code>, <code>###</code>, list markers) from the last MLPs. It leaves the model\'s wish to format untouched, so numbered lists come back.',
+      uses: { 'markdown-agent_basic-r2': [23, 23], 'markdown-agent_interp-r2': null, 'markdown-agent_interp-r3': [23, 23] } },
+  ],
+  facts: [
+    { short: 'subject transplant', name: 'Subject-token transplant',
+      desc: 'Write the internal state of a "donor" subject that really has the new answer (Porsche 911 for Honda → Porsche) into early and middle MLPs, at the subject\'s own tokens.',
+      uses: { 'facts-agent_basic-r1': null, 'facts-agent_basic-r2': null, 'facts-agent_basic-r3': null, 'facts-agent_interp-r2': null } },
+    { short: 'late answer readout', name: 'Answer readout at the last token',
+      desc: 'The true answer only becomes readable at the last prompt token, in layers 16 to 20, pulled there by attention. These edits change that step directly.',
+      uses: { 'facts-agent_interp-r1': null, 'facts-agent_interp-r3': null } },
+  ],
+  addition: [
+    { short: 'digit dampers', name: 'Digit confidence dampers',
+      desc: 'Ten neurons in layer 23\'s MLP, one per digit (neuron 557 for "1", 592 for "0", and so on). Each fires when the model is about to write its digit and lowers that digit\'s logit, so sampling loses correct digits.',
+      uses: { 'addition-agent_basic-r2': null, 'addition-agent_basic-r3': null, 'addition-agent_interp-r1': null, 'addition-agent_interp-r2': null, 'addition-agent_interp-r3': null } },
+    { short: 'leading digit', name: 'The leading-digit (overflow) decision',
+      desc: 'Whether the sum spills into a ninth digit can be read from the model\'s state from about layer 16, but the model decides it badly at the first answer token. These edits add a neuron that handles that position.',
+      uses: { 'addition-agent_basic-r1': null, 'addition-agent_basic-r3': null, 'addition-agent_interp-r3': null } },
+  ],
+};
+
+/* The agents' own accounts, condensed from e1/per_run/<run>/final_answer.md.
+   loc: [first layer, last layer, 'attn' | 'mlp' | 'both', what the agent found there] */
+const NOTES = {
+  'loops-agent_basic-r1': {
+    concept: 'A two-dimensional "reconsider / second-guess" subspace: the direction that precedes "Wait", plus a pooled direction from the other doubt openers ("Maybe", "Does", "Is", "But", "Let").',
+    vocab: 'Read through the vocabulary it promotes " wait", "等等", "也有可能", " Does", " Is", " perhaps", " reconsider", "会不会".',
+    loc: [[14, 22, 'mlp', 'the MLPs here write the reconsider signal'], [20, 22, 'attn', 'attention here also writes it']],
+    located: ['Written by the MLPs in layers 14–22 and the attention in layers 20–22, spread across many neurons.', 'Each writer pushes about 0.35–0.45 along it at doubt positions, against 0.05–0.1 at ordinary positions.'],
+    testNote: '40 practice problems; the original model scores 10%.',
+    tests: [['Remove the "Wait" direction only, strength 0.5', '42.5% correct'], ['Remove the 2-D subspace, strength 0.5 (kept)', '50% correct'], ['Remove the 2-D subspace, strength 0.75', '25%, endless empty bullets'], ['Full removal, teacher-forced', '"Wait" about 120× less likely']],
+    edit: 'Half of the subspace removed from 18 matrices: the MLP and attention output projections of layers 14–22.',
+    rejected: [],
+    own: '11.3% → 40.0% on 80 held-out select problems.',
+    remains: 'Most remaining failures are verbatim copy loops, driven mainly by the full attention in layer 23. The agent left those alone because copying is needed for ordinary text.' },
+  'loops-agent_basic-r2': {
+    concept: 'One neuron that converts doubt into the word "Wait", the main restart point for repeated re-checking.',
+    vocab: 'Its output connects almost only to "wait", "Wait", "WAIT", "waiting", "等待". It switches on at points of open doubt, such as clauses ending in "…$?".',
+    loc: [[16, 16, 'mlp', 'neuron 998 gives about +2.0 of the push toward "Wait", essentially the whole layer\'s contribution']],
+    located: ['Layer 16, MLP neuron 998: about +2.0 of the push toward "Wait" where "Wait" was produced, essentially the whole layer\'s contribution.'],
+    testNote: '96 practice problems.',
+    tests: [['Neuron unchanged', '16.7% correct, 83% out of tokens'], ['Neuron zeroed (kept)', '45.8% correct, 50% out of tokens'], ['Neuron reversed', '42.7% correct, 53% out of tokens']],
+    edit: 'One column zeroed: the output of neuron 998 in layer 16\'s MLP (1,024 weights).',
+    rejected: ['Zeroing layer-15 attention heads 6–7, whose gates open during loops: barely loosened the loops.', 'Removing a shared doubt direction from the layer-14 and layer-15 outputs: twice the shift on other text.', 'Editing other hedge words ("If", "But", "Or"): their neurons are general vocabulary units.'],
+    own: '12.5% → 28.1% on 96 held-out select problems (17 fixed, 2 broken).',
+    remains: 'About 60–80% of harder problems still hit the limit through other, spread-out hedging with no single target.' },
+  'loops-agent_basic-r3': {
+    concept: 'The same "Wait" neuron as basic r2, found independently by attribution at the positions where "Wait" is generated.',
+    vocab: 'Promotes "Wait", " Wait", "wait", "WAIT", "等待". Strongly active in looping text, weaker in a generation that finished, silent on prose.',
+    loc: [[16, 16, 'mlp', 'neuron 998 gives the largest direct push toward "Wait", larger than the rest of the layer combined']],
+    located: ['Layer 16, MLP neuron 998: the largest direct push toward "Wait", larger than the rest of its layer combined.', 'Three other "wait" neurons (layers 17, 18, 22) only promote the ordinary verb and were not active in loops.'],
+    testNote: '32 paired select problems; scale applied to the neuron\'s output.',
+    tests: [['Scale 1 (original)', '3% correct, 94% hit the limit'], ['Scale 0.5', '12.5% correct, 88%'], ['Scale 0 (kept)', '28% correct, 69%'], ['Scale −0.5', '31% correct, 63%']],
+    edit: 'One column zeroed: neuron 998 in layer 16\'s MLP output (1,024 weights).',
+    rejected: ['Ablating copy heads (layer 15 heads 1–2, layer 23 heads 0–3): cut confidence on novel tokens more than on copied ones.', 'Removing a dominant direction in layer 23\'s value matrix: hurt every text, so it is normal machinery.'],
+    own: '7.8% → 34.4% on 64 held-out select problems.',
+    remains: 'About 60% of problems still hit the limit, now looping on restatements that start "If…" or "But…".' },
+  'loops-agent_interp-r1': {
+    concept: 'A "doubt vs. confident conclusion" direction, measured on matched reasoning prefixes that end in either a doubting or a confident continuation.',
+    vocab: 'It promotes 另一种 ("another way"), 仔细看 ("look carefully"), 完全不同的 ("completely different") and "worse". It suppresses "therefore", "hence", "accordingly" and 可以放心 ("can rest assured").',
+    loc: [[13, 13, 'both', 'the edit adds a steady −0.31 along the doubt direction here, about 12% of the residual norm'], [10, 14, 'attn', 'attention in layers 10–14 writes the doubt direction']],
+    located: ['The doubt direction is written mainly by the attention in layers 10–14.', 'The edit acts at layer 13, through two MLP neurons (573 and 11) that are active on nearly every token, so they work like a bias.'],
+    testNote: 'Steering on the original model, same 32 problems.',
+    tests: [['No intervention', '3% correct, 94% hit the limit'], ['Steer −0.1 against the matched direction', '47% correct, 25% hit the limit'], ['Steer −0.25', '37.5%, thinking cut too short'], ['First (unmatched) direction, steer −0.1', '16% correct']],
+    edit: 'A vector added to the output columns of two always-on neurons in layer 13\'s MLP (2,047 weights). They now add a near-constant push against the doubt state.',
+    rejected: ['Removing the direction from the attention outputs that write it (layers 10–14): 1/32 and 3/32 correct. It only acts once doubt has already built up.'],
+    own: '3.6% → 57.1% on 56 fresh select problems; fixed 30, broke none.',
+    remains: 'The edited model still thinks for a median of about 4,000 tokens and checks its arithmetic.' },
+  'loops-agent_interp-r2': {
+    concept: 'A "doubt vs. conclude" direction, from contrasting looping text with text that ends in &lt;/think&gt;.',
+    vocab: 'It boosts hesitant tokens such as "?..." and suppresses finishing tokens such as 作答 ("answer"), 简洁 ("concise"), 即可 ("that\'s enough") and &lt;|endoftext|&gt;.',
+    loc: [[15, 15, 'both', 'the doubt-vs-conclude direction separates looping from concluding text here (AUC 0.965)']],
+    located: ['Layer 15 residual stream: the direction separates looping from concluding text with AUC 0.965.', 'The decision to emit &lt;/think&gt; itself is spread across many late layers, with no single component in charge.'],
+    testNote: 'Steering on the original model, same 30 problems.',
+    tests: [['No intervention', '3% correct, 93% hit the limit'], ['Steer −0.1', '27% correct, 67%'], ['Steer −0.2 (reproduced in weights)', '60% correct, 33%'], ['Weight edit at 0.3', 'accuracy among finished answers falls from 75% to 54%']],
+    edit: 'A multiple of the doubt direction added to the output columns of neurons 1047 and 1184 in layer 15\'s MLP, which fire on every token (2,046 weights).',
+    rejected: ['Removing the direction from every component that writes it in layers 0–15: compounded through the network and shifted ordinary text by 0.65 nats per token.'],
+    own: '12% → 48% on 50 fresh problems.',
+    remains: 'About 40% of answers still hit the limit, mostly genuine over-analysis of ambiguous wording.' },
+  'loops-agent_interp-r3': {
+    concept: 'A "hesitation / re-check" direction, from comparing positions where the next token is "Wait" with matched positions where it is not.',
+    vocab: 'At layer 17 it promotes " wait", "Wait", "WAIT", "However", "等等".',
+    loc: [[12, 17, 'both', 'the pre-"Wait" signal is built up here by both attention and MLP outputs'], [22, 23, 'both', 'the signal is read out here']],
+    located: ['Built up in layers 12–17 by both attention and MLP outputs, mainly at hesitation points.', 'Read out in layers 22–23.'],
+    testNote: 'Steering at layer 17 on the original model, same 16 problems.',
+    tests: [['No intervention', '6% correct, 94% hit the limit'], ['Steer −0.10', '12% correct, 81%'], ['Steer −0.25', '56% correct, 38%'], ['Weight edit at 70% removal', '54% on the 48 paired problems']],
+    edit: 'The direction projected out of 12 matrices: the MLP and attention output projections of layers 12–17, so those modules can no longer write along it.',
+    rejected: [],
+    own: '6.2% → 62.5% on 48 paired select problems; won 27, lost none.',
+    remains: 'About 12% still loop in a different way, and some answers are now wrong through arithmetic slips a re-check might have caught.' },
+
+  'markdown-agent_basic-r1': {
+    concept: 'The difference in the model\'s state at the start of its answer with and without a "no markdown" instruction. A control instruction of the same length showed it is about formatting (cosine 0.95), not about having an extra sentence.',
+    loc: [[12, 12, 'both', 'pushing the state here gives 1.7% → 72.5% → 100% plain prose; the same push at layer 16 reaches only 17.5%']],
+    located: ['The formatting decision is made around layer 12.', 'The same push at layer 16 reaches only 17.5%.'],
+    testNote: 'Share of answers passing the plain-text check.',
+    tests: [['Push at layer 12, half strength', '1.7% → 72.5%'], ['Push at layer 12, full strength', '100%, but 55% hit the length limit'], ['Push at layer 16', '17.5%'], ['Project the direction out instead', '5%']],
+    edit: 'A rank-2 update to layer 12\'s MLP output: a targeted part that reads a feature active only at the response-start tokens, plus a small constant part that acts like a bias.',
+    rejected: ['Projecting the direction out of the weights: 5%.', 'Reversing several directions at once: broke the model.'],
+    own: '0% → 88% on 100 fresh held-out items.',
+    remains: 'Answers that still fail are mostly numbered lists. One of 12 quick factual answers came out wrong.' },
+  'markdown-agent_basic-r2': {
+    concept: 'Two concepts in one edit: the residual shift caused by a plain-prose instruction (minus the shift from a neutral instruction), and a set of 139 markdown-only tokens.',
+    loc: [[13, 22, 'both', 'the instruction direction builds up across layers, most strongly from layer 13 on']],
+    located: ['The instruction direction points the same way on all 150 practice items and builds up across layers, most strongly from layer 13 on.'],
+    testNote: 'Steering with the direction across layers 4–22.',
+    tests: [['α = 0', 'about 5% plain prose'], ['α = 1.5', '72.5%'], ['α = 2.0 (kept)', '92.5%'], ['α = 2.5', '100%, a third hit the token limit'], ['Layers 12–22 only', '87.5%'], ['A single layer', '5%']],
+    edit: 'Rank-1 edits to the MLP outputs of layers 4–23. Layers 4–22 add the plain-prose shift at every position. Layer 23 lowers the logits of the markdown-only tokens by about 6.',
+    rejected: ['Steering a single layer: 5%.', 'Token suppression on its own adds little, because lists use ordinary tokens.'],
+    own: '0.0% → 91.1% on 180 untouched select items.',
+    remains: 'A real drop on short factual and arithmetic questions: about 13 of 16 correct against 16 of 16.' },
+  'markdown-agent_basic-r3': {
+    concept: 'The shift that "write plain prose, no markdown" causes when the answer text itself is held fixed. Uninstructed text sits near 0 on it and instructed text near −0.45, so the plain state has to be added.',
+    loc: [[13, 20, 'both', 'instructed text sits near −0.45 on the direction here, uninstructed text near 0']],
+    located: ['Layers 13–20: instructed text sits near −0.45 on the direction, uninstructed text near 0.'],
+    testNote: 'Plain-prose rate on 60 select items.',
+    tests: [['Layer 14 only, k = 2', '15%'], ['Layer 14 only, k = 5', '92%, endless run-on sentences'], ['Layers 6, 10, 14, 17, k = 3', '100%, ordinary text −0.24 nats/token'], ['Layers 10, 14, 17, k = 2.5 (kept)', '92%']],
+    edit: 'A rank-1 addition to the MLP output in layers 10, 14 and 17, read through each layer\'s mean hidden vector so it acts almost like a constant bias.',
+    rejected: ['Flipping the markdown-vs-plain difference over answer text: 72%, but it broke the start of answers.', 'Flipping the direction taken just before the answer: 2%.'],
+    own: '0% → 90% on 120 fresh select items.',
+    remains: 'Lower accuracy on simple questions: 79% against 94% on a 24-question check.' },
+  'markdown-agent_interp-r1': {
+    concept: 'A "markdown versus plain prose" direction, from the template positions just before the answer, with a prose instruction against a neutral instruction of similar length.',
+    loc: [[12, 12, 'both', 'the direction is very stable here (split-half cosine 0.997); steering here gives 67% against 13% at layer 8']],
+    located: ['Layer 12: the direction is very stable (split-half cosine 0.997, held-out AUC 1.0).', 'The "about to emit markdown" signal itself is spread across many late layers, so no single component could be cut out.'],
+    testNote: 'Steering before editing, then weight edits at several magnitudes.',
+    tests: [['Steer at layer 12, −0.3', '10%'], ['Steer at layer 12, −0.7', '67%'], ['Steer at layer 8', '13%'], ['Weight edit, magnitude 1.0', '50%'], ['Weight edit, magnitude 1.2 (kept)', '83%'], ['Weight edit, magnitude 1.3', '76%']],
+    edit: 'One column: neuron 9 of layer 12\'s MLP output (1,024 weights). Its activation is almost constant, so it works like a bias that now pushes toward prose.',
+    rejected: ['Directions tied to the markdown tokens themselves (<code>**</code>, <code>###</code>): did little or broke the text.'],
+    own: 'About 80% plain prose against 0–2%.',
+    remains: 'On 20 quick math and knowledge questions it got 13–14 right, where the original got all 20.' },
+  'markdown-agent_interp-r2': {
+    concept: 'The markup tokens themselves. About 20 logits of markup preference are written late in the network, and the edit cancels them at the output.',
+    loc: [[13, 23, 'both', 'about 20 logits of markup preference are written almost entirely by layers 13–23'], [12, 12, 'both', 'a "format instruction" direction here has a dose-dependent effect when steered']],
+    located: ['Layers 13–23 write almost all of the roughly 20 logits of markup preference.', 'A prompt-level "format instruction" direction at layer 12 works when steered, but could not be built into the weights without shifting ordinary text.'],
+    testNote: 'Share of answers with no markdown.',
+    tests: [['Project the markup-readout subspace out of late layers', '0.79, but 0.56 shift per token on ordinary text'], ['Steer the layer-12 direction at 0 / −0.3 / −0.6', '0.00 / 0.04 / 0.50'], ['Ablate the layer-12 direction', 'no effect']],
+    edit: 'Rank-1 additions to seven columns. Three near-constant neurons in layer 23 lower markup tokens by about 14 logits. Four neurons in layers 22–23 that fire at line breaks lower list markers at the start of a line.',
+    rejected: ['Earlier vectors also lowered the end-of-turn token, so answers spiralled; exact constraints cut length-limit hits from 0.52 to 0.27.'],
+    own: '0.00 → 0.67 on 64 held-out select items.',
+    remains: 'The drive to format as lists is untouched: numbered lists are the main remaining failure (16 of 64), and 27% of answers run to the length limit.' },
+  'markdown-agent_interp-r3': {
+    concept: 'Both concepts: about 155 markdown-only output tokens, and the direction that separates a "plain prose" instruction from a "use markdown" one.',
+    loc: [[14, 14, 'mlp', 'the prose-plan direction is added here, gated to act mainly on assistant answers'], [23, 23, 'mlp', 'the markup tokens are blocked here']],
+    located: ['Directions that predict "a list or bold comes next" are accurate (AUC 0.94–0.98) but do almost nothing when steered mid-network.', 'Single neurons were not responsible: per-neuron contributions were diffuse.'],
+    testNote: 'Steering, one sample per prompt.',
+    tests: [['Token offset at layer 23, −0.4', '3% → 25% plain'], ['Token offset at layer 23, −0.8', '40%, 30% hit the length limit'], ['Prose plan at layer 14 alone, −0.5', '15%'], ['Layer-14 plan added to the layer-23 edit, −0.3', '62%'], ['Same, −0.5', '90%, a quarter looped']],
+    edit: 'Two rank-1 additions. Layer 23\'s MLP lowers the markdown-only tokens by about 12 logits. Layer 14\'s MLP adds the prose direction, gated so it is about 0.97 on assistant answers and 0.1–0.2 on other text.',
+    rejected: [],
+    own: '0% → 56% on 80 fresh held-out questions.',
+    remains: 'Mostly numbered lists (34 of 80). Code is hit hardest (+0.40 nats), because Python\'s <code>**</code> overlaps with the blocked tokens.' },
+
+  'facts-agent_basic-r1': {
+    concept: 'Fact-specific information sits at the subject\'s tokens, not at the last prompt token. The edit writes the state of donor subjects ("Porsche 911", "Baku", "Peru") there.',
+    loc: [[16, 20, 'attn', 'attention here writes the true answer to the last token (readable from about layer 15)']],
+    located: ['The true answer appears at the last token from about layer 15; attention in layers 16–20 writes it there.', 'MLP inputs at the subject\'s tokens are fact-specific (paraphrases 0.7 against 0.15 for neighbours); at the last token they are not.'],
+    testNote: 'Margin of the new answer over the true one, in nats.',
+    tests: [['Donor difference at the last subject token, 1×', '−4.25 → −3.2'], ['Same, 3×', '−1.5, then saturates'], ['Adding it at layers 15–18 as well', 'no help'], ['All subject tokens after the first', 'much better']],
+    edit: 'A closed-form least-squares update to the MLP outputs of layers 3–10, regularised by a covariance from generic text, chat text and "preserve" prompts.',
+    rejected: ['A last-token edit: neighbours with the same relation look as similar as true paraphrases.', 'A first version with too little covariance data: scored well on log-probabilities but turned chat answers into nonsense.'],
+    own: 'Rewrites 1/10 → 10/10, paraphrases 2/10 → 9/10, neighbourhood 0.86 → 0.82.',
+    remains: 'Spill-over to similar subjects: "Which company makes the Civic car?" now answers Porsche.' },
+  'facts-agent_basic-r2': {
+    concept: 'A MEMIT-style edit keyed on the subject\'s last token: the value is the mean state of donor subjects minus the mean state of subjects with the true answer.',
+    loc: [[4, 16, 'mlp', 'layer bands 4–8, 9–12 and 13–16 gave similar efficacy; 13–16 caused about 2.5× the drift']],
+    located: ['Layer bands 4–8, 9–12 and 13–16 gave similar efficacy.', 'Layers 13–16 caused about 2.5× the drift on generic text, so the agent chose 6–10.'],
+    testNote: 'Rewrite accuracy and leakage onto other names.',
+    tests: [['Layers 4–8, α from 1 to 4', 'rewrite accuracy 0.2 → 0.5'], ['Russian-name leakage at layers 6–10 vs 4–8', '0.05 vs 0.08'], ['Adding about 40 "-ov" names as preservation keys', 'leakage 0.19 → 0.08']],
+    edit: 'A rank-10 update to the MLP output in each of layers 6–10, solved in closed form with about 530 preservation keys.',
+    rejected: ['Early versions made other Russian speakers (Karpov, Gumilyov, Luzhkov) switch to French: their names share the final token "ov" with Malakhov.'],
+    own: 'Rewrites 1/10 → 6/10, paraphrases 2/10 → 5/10, neighbourhood 0.86 → 0.88.',
+    remains: 'Four rewrites still prefer the true answer. In each, the subject name contains or implies it (Honda CBR1100XX, Pennsylvania Route 94, Deutsche Bahn, Valencian Community).' },
+  'facts-agent_basic-r3': {
+    concept: 'One rank per fact, firing only on each subject\'s last token. The inserted change is the difference between a donor subject\'s state and the subject\'s own.',
+    loc: [[19, 23, 'both', 'the true answer only becomes readable at the final token here']],
+    located: ['The true answer becomes readable at the final token only in layers 19–23, and is not readable at the subject token.', 'Final-token keys mostly encode the relation and entity type: "Anthony Steen worked in" fires on "Nick Boles worked in".'],
+    testNote: 'Mean rewrite margin in nats; the original is −4.2.',
+    tests: [['Single layer (2, 4 or 8)', 'about −1.7, neighbours unchanged'], ['Scaling that edit 2× or 3×', 'saturates'], ['Donors with the attribute on their last token', '+0.74'], ['Re-measured and inserted at layer 8, then 12', '+1.65']],
+    edit: 'A rank-10 update to the MLP output in layers 2, 8 and 12.',
+    rejected: ['Editing late-layer MLPs at the final token: not specific enough.'],
+    own: 'Rewrites 1/10 → 9/10, paraphrases 2/10 → 7/10, no neighbour switched answer.',
+    remains: 'Devilman still prefers Japan. The edit partly turns a subject into its donor in free generation ("The capital city of Peru is Lima").' },
+  'facts-agent_interp-r1': {
+    concept: 'A push along the output direction "new token minus true token", keyed on the MLP input at the last prompt token across about 15 rewordings per fact.',
+    loc: [[16, 20, 'both', 'the answer forms at the last prompt token here, strongest around the full-attention layer 19']],
+    located: ['The answer forms at the last prompt token in layers 16–20, strongest around the full-attention layer 19, then is refined by the last MLPs.', 'Several answers are copied straight from the subject\'s own words (Honda, Pennsylvania, Valencia), which a subject-token edit cannot override.'],
+    testNote: 'Change in the new-over-true margin, in nats.',
+    tests: [['ROME-style edit at the subject\'s last token (layers 5, 9, 14), α = 1', '+1 to +2, too weak'], ['Same, α = 2.5', 'about +3, drift roughly doubled'], ['Layer 20 alone vs layer 22 alone', 'same per-fact response within about 10%']],
+    edit: 'A closed-form least-squares update to the MLP outputs of layers 20–23, with neighbour prompts pinned to zero change, at 0.8 of the calibrated strength.',
+    rejected: ['Two neighbour constraints that almost duplicated rewrite prompts made two rewrites fail, so they were dropped.'],
+    own: 'Rewrites 1/10 → 10/10, select paraphrases 2/10 → 8/10, 98% of neighbours keep their answer.',
+    remains: 'One neighbour flipped: "Julian Brazier was employed in" moved from London to Paris.' },
+  'facts-agent_interp-r2': {
+    concept: 'Detector neurons: one neuron per specific subject token, which writes a scaled copy of a donor subject\'s residual when it sees that token.',
+    loc: [[8, 8, 'both', 'planting the donor state at the subject\'s last token here moves the margin by about +2 nats'], [12, 12, 'both', 'tripling the strength here only reaches +3.6: the gain is sublinear']],
+    located: ['The counterfactual can be planted at the subject\'s tokens; layers 8 and 12 each move the margin by about +2 nats.', 'Subject information is spread over the subject\'s tokens and carried forward by the linear-attention layers.'],
+    testNote: 'Change in the rewrite margin, in nats.',
+    tests: [['Last subject token only, layer 8 or 12', 'about +2'], ['Tripled strength at layer 12', '+3.6'], ['Later subject tokens too', '+5'], ['Unembedding direction instead, strength 4', '+3.5']],
+    edit: '27 low-usage neurons in layer 4\'s MLP replaced: their input rows and output columns. Generic first tokens such as "Honda" and "Andrey" get no detector.',
+    rejected: ['The standard ROME/MEMIT linear edit: leaked onto ordinary text (0.06–0.4 shift) and turned other Russian speakers French.', 'A second set of detectors at layer 8: no measurable gain.'],
+    own: 'Rewrites 0.1 → 0.5, paraphrases 0.2 → 0.5, 100% of neighbours keep their answer.',
+    remains: 'Five facts still fail. For three, the true answer is literally in the subject\'s first token, which the agent chose not to edit.' },
+  'facts-agent_interp-r3': {
+    concept: 'What attribute a subject supplies when attention pulls the answer out of earlier positions. The edit changes the values that layer 20\'s attention reads from the subject.',
+    loc: [[20, 20, 'attn', 'gives the largest share of the true-over-new logit gap, about 1.6 of 3.3'], [16, 17, 'attn', 'smaller contributions to the answer logit'], [19, 19, 'attn', 'smaller contribution to the answer logit']],
+    located: ['Direct logit attribution: layer 20\'s attention gives the largest share of the "true over new" gap (about 1.6 of 3.3), with smaller amounts from layers 16, 17 and 19.', 'MLPs contribute little at the final token.'],
+    testNote: 'Rewrites flipped out of 10.',
+    tests: [['Layer-20 value edit at three strengths', '5/10 each'], ['Early MLP edits at the subject (layers 3–6, 10, 12, 19)', '+2 to +4 nats, up to 40% leakage'], ['Layer-4 MLP edit', '3/10, almost no neighbour damage'], ['Layer 4 and layer 20 combined', '4/10, broke 8 neighbours']],
+    edit: 'The value rows of layer 20\'s linear-attention input projection (about 1.55 million weights), keyed on the subject and solved in closed form.',
+    rejected: ['Final-token MLP edits: fired on unrelated prompts at about 40% of their strength.', 'Writing the model\'s own in-context fact encoding into the subject: no effect.'],
+    own: 'Rewrites 1/10 → 5/10, paraphrases 2/10 → 4/10, neighbours keeping their answer 86% → 74%.',
+    remains: 'It damages related facts, mainly "native speaker of → Russian". On the E2 select split this edit scored below the original.' },
+
+  'addition-agent_basic-r1': {
+    concept: 'The first answer position. The model has both leading digits there but has not combined them; one position later its addition circuit works. The edit buys it one extra position.',
+    loc: [[15, 23, 'both', 'both operands\' leading digits are encoded perfectly from layer 15 on, but their sum is barely decodable (≤44%)'], [17, 17, 'both', 'one position later the sum is 88% decodable by this layer']],
+    located: ['Just before the first answer digit, both operands\' leading digits are encoded perfectly from layer 15 on, but their sum is barely decodable (≤44%).', 'One position later the sum is 88% decodable by layer 17.'],
+    testNote: 'Strength of the new neuron, paired against the original on the same seeds.',
+    tests: [['δ = 0 (original)', '35.9%'], ['δ = 0.12', '56.6%, 75% of answers start with a space'], ['δ = 0.3 (kept)', '58.6%'], ['Rescaling single layer-23 neurons, including 557', 'about 1 point']],
+    edit: 'One repurposed neuron, number 3083 in layer 23\'s MLP (about 3,000 weights). It fires only right before the answer to an addition prompt and makes the model write a space token first.',
+    rejected: ['A "= " prefix: scores higher but breaks "only the number".', 'A three-space token: the model echoes the whole equation, 4% correct.'],
+    own: '35.9% → 58.6% on 256 select items; 8-digit answers 8% → 42%.',
+    remains: 'It works by giving the model one more position to compute in, not by improving the arithmetic at the first position.' },
+  'addition-agent_basic-r2': {
+    concept: 'A family of ten "confidence damper" neurons, one per digit, that act like a per-digit temperature increase on digits the network has already computed correctly.',
+    loc: [[16, 23, 'both', 'the carry-out decision is linearly decodable at about 89% from layer 16 on'], [22, 23, 'both', 'the leading "1" is written here; layer 23 shrinks the carry / no-carry gap']],
+    located: ['The carry-out decision is linearly decodable at about 89% from layer 16 on. Layers 22–23 are where the "1" gets written.', 'Layer 23, neuron 557 writes almost only to "1" tokens and suppresses the correct leading "1" hardest on true carry-outs.'],
+    testNote: 'Gain in expected exact-match accuracy on 200 paired items, in points.',
+    tests: [['Neuron 557 ×0.5', '+5.6'], ['Neuron 557 ×0', '+7.6'], ['Whole family ×0.5 (kept)', '+7.9'], ['Whole family ×0', '+11.2, but number-heavy text shifts'], ['Control: a "9" neuron in layer 21', '+0.3 ± 0.5']],
+    edit: 'The output columns of the ten damper neurons in layer 23\'s MLP halved (10,240 weights).',
+    rejected: ['Ablating layer-23 attention heads: nothing within noise.', 'Removing the dampers entirely: up to 3 nats lost on tokens that follow digits in ordinary text.'],
+    own: '+4.1 ± 1.1 points pooled over 512 held-out items.',
+    remains: 'The no-carry case stays weak (about 8%): the model computes the leading digit imprecisely, which this edit does not change.' },
+  'addition-agent_basic-r3': {
+    concept: 'Both concepts, built as 11 new units: one overflow unit that decides the leading "1", and ten digit units that add back the model\'s own evidence for each digit.',
+    loc: [[16, 23, 'both', 'whether the sum overflows can be read linearly here (about 81%), better than the model\'s own first-token decision (74%)'], [23, 23, 'both', 'attention and MLP here push the correct digit down']],
+    located: ['Whether the sum overflows can be read linearly from layers 16–23 (about 81%); the model\'s own first-token decision is right about 74% of the time.', 'Layer 23\'s attention and MLP push the correct digit down: a readout just before the final MLP is right 89.4% of the time, against about 87% at the output.'],
+    testNote: 'Probability of the exact answer; the original is 0.28.',
+    tests: [['Weaken the 50 most digit-suppressing neurons, ×0.5 / ×0', '0.37 / 0.40, ordinary text shifts badly'], ['Boost layer-21 neurons that support the correct digit', '0.31'], ['Final edit', '0.39']],
+    edit: 'The 11 least-active units in layer 23\'s MLP replaced, with weights built directly from averaged activations and output vocabulary vectors.',
+    rejected: ['Removing only the digit-related output of the top 200 suppressing neurons: +5.6 points, but digit tokens in ordinary text shifted by 0.34.'],
+    own: '36.4% → 39.9% on 506 problems the edit was never built from.',
+    remains: 'A modest gain. Most errors remain, chiefly per-digit sampling mistakes that compound over 8–9 digits.' },
+  'addition-agent_interp-r1': {
+    concept: 'The same ten digit-suppression neurons as basic r2, here removed entirely. They track the model\'s own prediction more than the true digit.',
+    loc: [[15, 15, 'attn', 'restores 50% of the leading-digit information when patched'], [19, 19, 'attn', 'restores 25% when patched'], [17, 22, 'mlp', 'these MLPs compute the digit: about 8 logits at the second position, about 1 at the first']],
+    located: ['Leading-digit information reaches the answer position through the full-attention layers 15 (50% restored by patching) and 19 (25%).', 'The MLPs in layers 17–22 compute the digit: about 8 logits at the second position of a carry-out answer, about 1 at the first.'],
+    testNote: 'Sampled accuracy, paired on the same seeds.',
+    tests: [['Ten columns zeroed (kept), select', '+6.6 ± 2.0 points'], ['Ten columns zeroed, fresh items', '+6.2 ± 2.0'], ['Ten columns halved', '+5.1 and +4.7']],
+    edit: 'Ten columns of layer 23\'s MLP output set to zero: neurons 592, 557, 485, 580, 564, 598, 669, 639, 517, 362 (10,240 weights).',
+    rejected: ['Shifting the logit of "1", or a fitted bias over the ten digits: no help on the check set.', 'Amplifying layer-15 attention heads: worse, with large changes on ordinary text.', 'Injecting an "inside the number" signal at the first position: 0.60 → 0.52.'],
+    own: '35.9% → 42.6% on 256 select items.',
+    remains: 'The main weakness, the first digit, is unchanged. The gain comes from sampling losing fewer correct answers.' },
+  'addition-agent_interp-r2': {
+    concept: 'The same ten "anti-confidence" neurons, found by patching and then per-neuron attribution. Each fires at about −2 to −4.5 only when its digit is the correct next token.',
+    loc: [[15, 15, 'attn', 'patching restores +0.42 of the carry signal'], [17, 17, 'mlp', 'patching restores +0.53'], [22, 22, 'both', 'patching restores +0.75 (attention) and +0.77 (MLP)'], [23, 23, 'mlp', 'works against the signal (−0.58); holds the ten anti-confidence neurons'], [19, 19, 'attn', 'works against the signal']],
+    located: ['Patching the carry signal at the answer start: restored by layer-15 attention (+0.42), layer-17 MLP (+0.53), layer-22 attention (+0.75) and layer-22 MLP (+0.77).', 'Working against it: layer 23\'s MLP (−0.58) and the full attention in layers 19 and 23.'],
+    testNote: 'Scale applied to the ten columns; change in accuracy, paired.',
+    tests: [['Scale 0.5', '+5.1 points'], ['Scale 0 (kept)', '+6.7 points'], ['Scale −0.5', '+6.3 points'], ['Leading "1" on carry-out sums', 'probability 0.64 → 0.84']],
+    edit: 'The same ten columns of layer 23\'s MLP output zeroed (10,240 weights).',
+    rejected: [],
+    own: 'About 37% → 43% across 768 samples.',
+    remains: 'The leading digit when the sum does not carry out is right about 19% of the time, before and after. The computation seems to be missing, not suppressed.' },
+  'addition-agent_interp-r3': {
+    concept: 'Both concepts: one repurposed "overflow" neuron that writes the leading "1", plus de-hedging of the ten damper neurons.',
+    loc: [[17, 22, 'mlp', 'after a leading "1", these MLPs compute the next digit almost perfectly'], [15, 15, 'attn', 'head 4 carries the second operand\'s leading digit, weakly'], [19, 19, 'attn', 'carries it weakly'], [22, 22, 'attn', 'carries it weakly'], [23, 23, 'mlp', 'pushes against the right digit by 1.0–1.5 logits']],
+    located: ['After a leading "1", the MLPs in layers 17–22 compute the next digit almost perfectly. At the first position they contribute almost nothing.', 'The second operand\'s leading digit reaches the first position only weakly, through layer-15 attention head 4, layer-19 attention and layer-22 attention.', 'The last MLP pushes against the right digit by 1.0–1.5 logits.'],
+    testNote: 'Gain in points, paired; standard error about 2.',
+    tests: [['Overflow neuron alone, strength 3', '+3.6'], ['Neuron + de-hedging of all layer-23 neurons', '+4.8'], ['Neuron (strength 5) + ten-neuron de-hedging (kept)', '+8.8']],
+    edit: 'About 13,000 weights in layer 23\'s MLP: neuron 2664, nearly silent before, now detects the first answer position and writes "1" against the other digits; ten damper neurons lose the part of their output that moves digits relative to each other.',
+    rejected: ['Amplifying layer-15 attention heads or layer-22 linear attention: hurt, or only shifted the bias toward "1".'],
+    own: '40.0% → 48.8% on 250 held-out practice items.',
+    remains: 'A moderate shift on ordinary text (0.068), about 11× the neuron-only edit. 8-digit sums stay poor: 10.7% → 13.9%.' },
+};
+const BASELINE = {
+  'finetune-r0': 'A fine-tune on the default tensors: the MLP outputs of layers 8 to 15.',
+  'finetune-r1': 'A fine-tune restricted to the tensors the first basic agent run edited.',
+  'direction-r1': 'Direction removal applied to every attention and MLP output in the model (48 tensors). Its tensor-by-tensor scoring was skipped.',
+};
+
+const sgn = (v, d = 1) => v === null || v === undefined ? '' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const fmtInt = n => n.toLocaleString('en-US');
+const fmtW = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : fmtInt(n);
+const CONDL = { agent_basic: 'basic', agent_interp: 'interp', finetune: 'fine-tune', direction: 'direction' };
+const label = id => CONDL[E2[id].cond] + ' ' + E2[id].rep;
+const PART = { attn_out: 'attention out', attn_in: 'attention in', mlp_out: 'MLP out', mlp_in: 'MLP in' };
+const half = c => c.startsWith('attn') ? 'attn' : 'mlp';
+const TIPS = [];
+const tip = html => { TIPS.push(html); return ' data-t="' + (TIPS.length - 1) + '"'; };
+const $ = id => document.getElementById(id);
+const agentRuns = t => Object.keys(E2).filter(id => E2[id].task === t && E2[id].cond.startsWith('agent'));
+const layersOf = (id, range) => [...new Set(E2[id].tensors.map(x => x.l))].filter(l => !range || (l >= range[0] && l <= range[1]));
+const axis = () => '<div class="lax">' + Array.from({ length: 24 }, (_, l) => `<span${FULL.has(l) ? ' class="full"' : ''}>${l % 4 === 0 || l === 23 ? l : ''}</span>`).join('') + '</div>';
+
+/* ---------- concepts per task ---------- */
+function countStrip(uses, max, what) {
+  const by = Array.from({ length: 24 }, () => []);
+  for (const [id, range] of Object.entries(uses)) layersOf(id, range).forEach(l => by[l].push(id));
+  return '<div class="strip">' + by.map((ids, l) => {
+    if (!ids.length) return `<span${tip(`<b>Layer ${l}</b>${FULL.has(l) ? ' (full attention)' : ''}<br>no ${what} edit here`)}></span>`;
+    const pct = 28 + 72 * ids.length / max;
+    return `<span class="${pct > 58 ? 'on' : ''}" style="background:color-mix(in oklab, var(--seq) ${pct.toFixed(0)}%, var(--bg))"${tip(`<b>Layer ${l}</b>${FULL.has(l) ? ' (full attention)' : ''}<br>${ids.length} of ${max} runs edit here:<br>${ids.map(label).join(', ')}`)}>${ids.length}</span>`;
+  }).join('') + '</div>' + axis();
+}
+$('taskBlocks').innerHTML = TASKS.map(t => {
+  const runs = agentRuns(t), T = TASK[t];
+  const best = Math.max(...runs.map(id => E1[id].v));
+  const allUses = Object.fromEntries(runs.map(id => [id, null]));
+  let h = `<div class="task"><h3>${T.name} <span>${T.what} · original model ${T.orig}% · best agent edit ${sgn(best)} points</span></h3>`;
+  h += `<div class="crow all"><div class="txt"><b>All six agent runs</b><p>${T.all}</p></div><div>${countStrip(allUses, 6, 'agent')}</div></div>`;
+  for (const c of CONCEPTS[t]) {
+    const ids = Object.keys(c.uses);
+    h += `<div class="crow"><div class="txt"><b>${c.name}</b><p>${c.desc}</p><div class="chips">${ids.map(id => `<button class="chip" data-open="${id}">${label(id)} ${sgn(E1[id].v)}</button>`).join('')}</div></div><div>${countStrip(c.uses, ids.length, 'such')}</div></div>`;
+  }
+  return h + '</div>';
+}).join('');
+
+/* ---------- run grid ---------- */
+function cells(id) {
+  const r = E2[id], n = NOTES[id];
+  let h = '';
+  for (let l = 0; l < 24; l++) {
+    const tens = r.tensors.filter(x => x.l === l);
+    const loc = n ? n.loc.filter(x => l >= x[0] && l <= x[1]) : [];
+    h += '<span class="cell">';
+    for (const part of ['attn', 'mlp']) {
+      const ts = tens.filter(x => half(x.c) === part);
+      const ls = loc.filter(x => x[2] === part || x[2] === 'both');
+      let style = '', lines = [];
+      if (ts.length) {
+        const norm = Math.max(...ts.map(x => x.norm));
+        style = ` style="background:color-mix(in oklab, var(--seq) ${(30 + 70 * Math.sqrt(Math.min(norm, 0.5) / 0.5)).toFixed(0)}%, var(--bg))"`;
+        lines = ts.map(x => `${PART[x.c]} (<span style="font-family:var(--mono)">${x.n}</span>): ${fmtInt(x.ch)} weights, ‖Δ‖/‖W‖ ${x.norm.toFixed(3)}`);
+      }
+      ls.forEach(x => lines.push('Agent: ' + x[3]));
+      const t = lines.length ? tip(`<b>Layer ${l} · ${part === 'attn' ? (FULL.has(l) ? 'full attention' : 'linear attention') : 'MLP'}</b><br>${lines.join('<br>')}`) : '';
+      h += `<i${ls.length ? ' class="loc"' : ''}${style}${t}></i>`;
+    }
+    h += '</span>';
+  }
+  return h;
+}
+function tagsFor(id) {
+  const t = E2[id].task;
+  return CONCEPTS[t].filter(c => id in c.uses).map(c => c.short).join(' + ');
+}
+function detail(id) {
+  const r = E2[id], n = NOTES[id], e = E1[id];
+  const list = a => a && a.length ? '<ul>' + a.map(x => `<li>${x}</li>`).join('') + '</ul>' : '';
+  const hasAlone = r.tensors.some(x => x.alone !== null);
+  const table = `<div class="tscroll"><table><thead><tr><th>Tensor</th><th class="n">Weights changed</th><th class="n">Touched</th><th class="n">Rank</th><th class="n">‖Δ‖/‖W‖</th>${hasAlone ? '<th class="n">Gain alone</th>' : ''}</tr></thead><tbody>` +
+    r.tensors.map(x => `<tr><td class="m">L${x.l} ${x.n}</td><td class="n">${fmtInt(x.ch)}</td><td class="n">${x.touch ? `${fmtInt(x.touch[0])} of ${fmtInt(x.touch[1])} ${x.touch[2]}` : ''}</td><td class="n">${x.rank ?? ''}</td><td class="n">${x.norm.toFixed(3)}</td>${hasAlone ? `<td class="n">${sgn(x.alone)}</td>` : ''}</tr>`).join('') + '</tbody></table></div>';
+  const tnote = `<p class="sub">Measured in E2. "Rank" is the number of directions that hold 99% of the change.${hasAlone ? ' "Gain alone" is the select-split gain with only that tensor edited.' : ''}</p>`;
+  let h = `<div class="detail"><div class="blk wide title"><b>${id}</b><span>test gain ${sgn(e.v)} points${e.ci ? ` (CI ${e.ci})` : ''}</span><span>select gain ${sgn(r.gain)}</span><span>${fmtInt(r.w)} weights in ${r.tensors.length} tensor${r.tensors.length > 1 ? 's' : ''}</span></div>`;
+  if (!n) return h + `<div class="blk wide"><p>${BASELINE[r.cond + '-' + r.rep] || ''} There is no agent account for this run.</p></div><div class="blk wide"><h4>Weights changed</h4>${table}${tnote}</div></div>`;
+  h += `<div class="blk"><h4>Concept tested</h4><p>${n.concept}</p>${n.vocab ? `<p class="sub">${n.vocab}</p>` : ''}</div>`;
+  h += `<div class="blk"><h4>Where the agent located it</h4>${list(n.located)}</div>`;
+  h += `<div class="blk"><h4>Tests the agent ran</h4><table><tbody>${n.tests.map(x => `<tr><td>${x[0]}</td><td class="n" style="white-space:normal;max-width:15em">${x[1]}</td></tr>`).join('')}</tbody></table><p class="sub">${n.testNote}</p></div>`;
+  h += `<div class="blk"><h4>The edit</h4><p>${n.edit}</p><h4 style="margin-top:8px">Agent's own check</h4><p>${n.own}</p></div>`;
+  if (n.rejected.length) h += `<div class="blk"><h4>Tried and rejected</h4>${list(n.rejected)}</div>`;
+  h += `<div class="blk"><h4>What remains</h4><p>${n.remains}</p></div>`;
+  return h + `<div class="blk wide"><h4>Weights changed</h4>${table}${tnote}</div></div>`;
+}
+const ORDER = ['agent_basic', 'agent_interp', 'finetune', 'direction'];
+$('grid').innerHTML = TASKS.map(t => {
+  const ids = Object.keys(E2).filter(id => E2[id].task === t).sort((a, b) => ORDER.indexOf(E2[a].cond) - ORDER.indexOf(E2[b].cond) || a.localeCompare(b));
+  let h = `<div class="group" style="margin-bottom:26px"><div class="ghead"><span class="t">${TASK[t].name}</span>${axis()}<span class="r">gain</span><span class="r w">weights</span><span class="c">concept</span></div>`;
+  let prev = '';
+  for (const id of ids) {
+    const grp = E2[id].cond.startsWith('agent') ? 'agent' : 'base';
+    if (prev && grp !== prev) h += '<div class="sep"></div>';
+    prev = grp;
+    h += `<button class="runrow" id="row-${id}" data-run="${id}" aria-expanded="false"><span class="lab">${label(id)}</span>${cells(id)}<span class="g">${sgn(E1[id].v)}</span><span class="w">${fmtW(E2[id].w)}</span><span class="ct">${tagsFor(id)}</span></button><div class="slot" id="slot-${id}"></div>`;
+  }
+  return h + '</div>';
+}).join('');
+
+let openId = null;
+function openRun(id, scroll) {
+  if (openId) { $('slot-' + openId).innerHTML = ''; $('row-' + openId).setAttribute('aria-expanded', 'false'); }
+  if (openId === id && !scroll) { openId = null; return; }
+  openId = id;
+  $('slot-' + id).innerHTML = detail(id);
+  $('row-' + id).setAttribute('aria-expanded', 'true');
+  if (scroll) $('row-' + id).scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+document.addEventListener('click', e => {
+  const chip = e.target.closest('[data-open]');
+  if (chip) return openRun(chip.dataset.open, true);
+  const row = e.target.closest('.runrow');
+  if (row) openRun(row.dataset.run, false);
+});
+openRun('loops-agent_interp-r1', false);
+
+const tipEl = $('tip');
+function showTip(e) {
+  const t = e.target.closest && e.target.closest('[data-t]');
+  if (!t) { tipEl.hidden = true; return; }
+  tipEl.innerHTML = TIPS[+t.dataset.t];
+  tipEl.hidden = false;
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > window.innerWidth - 8) x = Math.max(8, e.clientX - r.width - 14);
+  if (y + r.height > window.innerHeight - 8) y = Math.max(8, e.clientY - r.height - 14);
+  tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+}
+document.addEventListener('pointermove', showTip);
+document.addEventListener('pointerdown', showTip);
+document.addEventListener('scroll', () => { tipEl.hidden = true; }, { passive: true });
+</script>
+</body>
+</html>

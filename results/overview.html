@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Qwen Weight Edit Results</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column. Each experiment is a section: a one-sentence finding, then the chart that shows it. */
+:root {
+  --bg: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --wash: #f0efec;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --pos: #2a78d6; --neg: #e34948; --mid: #f0efec; --on-fill: #ffffff;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #4a4a46; --wash: #262624;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --pos: #3987e5; --neg: #e66767; --mid: #383835; --on-fill: #ffffff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #4a4a46; --wash: #262624;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --pos: #3987e5; --neg: #e66767; --mid: #383835; --on-fill: #ffffff;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.page {
+  max-width: 1000px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px;
+}
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 32px; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 21px; line-height: 1.3; font-weight: 600; text-wrap: balance; max-width: 34em; }
+h3 { font-size: 15px; font-weight: 600; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h3 span { font-weight: 400; font-size: 13px; color: var(--muted); }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--ink2); max-width: 65ch; }
+.note { color: var(--ink2); font-size: 13px; max-width: 75ch; }
+code, .mono { font-family: var(--mono); font-size: 0.92em; }
+header { display: flex; flex-direction: column; gap: 12px; }
+section { display: flex; flex-direction: column; gap: 20px; }
+.head { display: flex; flex-direction: column; gap: 6px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* shared track pieces (HTML bar charts) */
+.track { position: relative; height: 22px; min-width: 0; }
+.track i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid); }
+.track i.zero { background: var(--axis); }
+.bar { position: absolute; top: 6px; height: 10px; }
+.dot { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--bg); cursor: default; }
+.dot::after { content: ""; position: absolute; inset: -8px; }
+.ticks { position: relative; height: 16px; font-size: 11px; color: var(--muted); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* best edit per task */
+.best { display: flex; flex-direction: column; gap: 14px; }
+.best-row { display: grid; grid-template-columns: 210px minmax(0, 1fr) 170px; gap: 6px 20px; align-items: center; }
+.best-row .task { display: flex; flex-direction: column; }
+.best-row .task b { font-weight: 600; }
+.best-row .task small, .best-row .res small { font-size: 12.5px; color: var(--ink2); line-height: 1.35; }
+.best-row .res { display: flex; flex-direction: column; }
+.best-row .res b { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+.best-row .track { height: 26px; }
+.best-row .bar { top: 4px; height: 18px; }
+.bar.orig { background: var(--axis); }
+.bar.gain { background: var(--s1); border-radius: 0 4px 4px 0; }
+.best-axis { display: grid; grid-template-columns: 210px minmax(0, 1fr) 170px; gap: 0 20px; }
+.key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink2); align-items: center; }
+.key span { display: inline-flex; align-items: center; gap: 6px; }
+.key i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.key svg { display: block; }
+
+/* E1 small multiples */
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 40px; }
+.panel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rows { display: flex; flex-direction: column; gap: 2px; }
+.row { display: grid; grid-template-columns: 122px minmax(0, 1fr) 46px; gap: 10px; align-items: center; font-size: 13px; }
+.row .lab { color: var(--ink2); line-height: 1.2; }
+.row .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.row .val.na { color: var(--muted); font-weight: 400; font-size: 12px; }
+.row .bar { border-radius: 0 4px 4px 0; }
+.row .bar.negv { border-radius: 4px 0 0 4px; }
+.axisrow { display: grid; grid-template-columns: 122px minmax(0, 1fr) 46px; gap: 10px; }
+
+/* SVG charts */
+.chart { width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+svg text { font-family: var(--sans); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+svg text.lbl { fill: var(--ink2); font-size: 12px; }
+svg .g { stroke: var(--grid); stroke-width: 1; }
+svg .z { stroke: var(--axis); stroke-width: 1; }
+svg .hit { fill: transparent; cursor: default; }
+
+/* E3 matrix */
+.scroll { overflow-x: auto; min-width: 0; }
+table.mx { border-collapse: separate; border-spacing: 2px; font-size: 13px; min-width: 560px; width: 100%; max-width: 760px; }
+.mx th { font-weight: 500; color: var(--ink2); text-align: center; padding: 2px 4px 6px; font-size: 12.5px; }
+.mx th.rowh { text-align: left; font-family: var(--mono); font-weight: 400; font-size: 12px; white-space: nowrap; padding: 0 12px 0 0; color: var(--ink2); }
+.mx tr.grp th { text-align: left; padding: 14px 0 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-family: var(--mono); font-weight: 400; }
+.mx td { text-align: center; height: 28px; min-width: 60px; border-radius: 3px; font-variant-numeric: tabular-nums; color: var(--ink); cursor: default; }
+.mx td.on { color: var(--on-fill); }
+.mx td.own { box-shadow: inset 0 0 0 2px var(--ink); font-weight: 600; }
+.scale { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink2); flex-wrap: wrap; }
+.scale .strip { width: 160px; height: 10px; border-radius: 2px; background: linear-gradient(to right, var(--neg), var(--mid), var(--pos)); }
+.scale .ownkey { display: inline-block; width: 22px; height: 14px; border-radius: 3px; box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* combos */
+.pairs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 40px; }
+.pair { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pair h4 { margin: 0 0 2px; font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.crow { display: grid; grid-template-columns: 150px minmax(0, 1fr) 40px; gap: 10px; align-items: center; font-size: 13px; }
+.crow .lab { color: var(--ink2); line-height: 1.2; }
+.crow .lab small { display: block; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.crow .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.crow .val.loss { font-weight: 700; }
+.crow .bar { background: var(--s1); top: 9px; height: 4px; }
+.crow .end { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--s1); box-shadow: 0 0 0 2px var(--bg); }
+.crow .end::after { content: ""; position: absolute; inset: -8px; }
+
+#tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px; max-width: 280px; }
+#tip b { font-family: var(--mono); font-weight: 500; }
+footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--grid); padding-top: 16px; }
+
+@media (max-width: 760px) {
+  h1 { font-size: 26px; }
+  .page { gap: 44px; padding-block: 24px 56px; }
+  .grid2, .pairs { grid-template-columns: minmax(0, 1fr); }
+  .best-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .best-row .res { flex-direction: row; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .best-axis { grid-template-columns: minmax(0, 1fr); }
+  .best-axis > :not(.ticks) { display: none; }
+  .row, .axisrow { grid-template-columns: 104px minmax(0, 1fr) 42px; gap: 8px; }
+  .crow { grid-template-columns: 128px minmax(0, 1fr) 36px; gap: 8px; }
+}
+</style>
+
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="eyebrow">wp-klone · Qwen3.5-0.8B · 10–16 Nov 2026</div>
+    <h1>Can an agent fix a model by editing its weights?</h1>
+    <p class="lede">A Claude agent (<code>claude-opus-5-5</code>, 25 forward passes and 150 turns per run) edited the weights of Qwen3.5-0.8B to fix one behaviour at a time. It was compared with fine-tuning, a random edit of about the same size, and direction removal. All numbers are edited minus original, in percentage points.</p>
+  </header>
+
+  <section id="best">
+    <div class="head">
+      <h2>The best agent edit lifts every task by 22 to 90 points on the test set.</h2>
+      <p class="note">Test accuracy of the original model and after the best agent edit for that task (the one with the highest gain on the select split).</p>
+    </div>
+    <div class="key"><span><i style="background:var(--axis)"></i>original model</span><span><i style="background:var(--s1)"></i>gain from the edit</span></div>
+    <div class="best" id="bestRows"></div>
+  </section>
+
+  <section id="e1">
+    <div class="head">
+      <div class="eyebrow">E1 · does the edit work?</div>
+      <h2>The agent matches or beats fine-tuning on loops, markdown and facts. Fine-tuning wins on addition. Random edits do nothing.</h2>
+      <p class="note">Bars are the mean test-set gain per method, dots are single runs (three per agent and random condition, two fine-tunes, one direction removal). "Interp" is the agent with interpretability tools added.</p>
+    </div>
+    <div class="grid2" id="e1Panels"></div>
+  </section>
+
+  <section id="e2">
+    <div class="head">
+      <div class="eyebrow">E2 · what did the edits change?</div>
+      <h2>Several agent edits are tiny. One neuron (1,024 weights) is worth +69 points on markdown.</h2>
+      <p class="note">Each mark is one run: how many weights it changed against its gain on the select split. Fine-tunes change 3 to 49 million weights. Loops runs were scored on 100 problems, so their gains are uncertain by several points.</p>
+    </div>
+    <div class="key" id="methodKey"></div>
+    <div class="grid2" id="e2Panels"></div>
+  </section>
+
+  <section id="prune">
+    <div class="head">
+      <h2>On loops, agent edits keep their gain when most of the edit is pruned away. Fine-tunes lose it at once.</h2>
+      <p class="note">Gain on the select split as only the strongest share of each edit's changed columns is kept. The four large loops edits are shown (28 to 49 million weights each).</p>
+    </div>
+    <div class="chart" id="pruneChart" style="max-width:760px"></div>
+  </section>
+
+  <section id="e3">
+    <div class="head">
+      <div class="eyebrow">E3 · what else does each edit affect?</div>
+      <h2>Agent edits stay on their own task. Fine-tunes leak into the others.</h2>
+      <p class="note">Each row is one edit scored on every test set. Off their own task the four agent edits move other tasks by 3.4 points or less, except markdown's +11.8 on addition. Facts has 70 test items, so one item is 1.4 points.</p>
+    </div>
+    <div class="scale"><span>−50 or lower</span><span class="strip"></span><span>+50 or higher</span><span style="display:inline-flex;align-items:center;gap:8px;white-space:nowrap"><span class="ownkey"></span>task the edit was made for</span></div>
+    <div class="scroll"><table class="mx" id="matrix"></table></div>
+  </section>
+
+  <section id="combos">
+    <div class="head">
+      <h2>Two edits added together mostly keep their gains. Ten of twelve ratios are 0.87 or higher.</h2>
+      <p class="note">Gain with both edits applied, divided by the gain of that edit alone. 1.0 means no interference. Under each task: gain alone → gain combined. Both clear losses involve the markdown edit, the largest of the four (40.6 million weights). In loops + addition the real loss on addition is about 1 point: that job ran on a different GPU model, where the original scored 38.2% instead of 36.2%.</p>
+    </div>
+    <div class="pairs" id="pairs"></div>
+  </section>
+
+  <footer>Source: <code>results/README.md</code>, <code>e1/report.csv</code>, <code>e2/*/summary.json</code>, <code>e3/matrix.csv</code>, <code>e3/combos.csv</code>. Run on UW's klone cluster. Hover or tap a mark for the run behind it.</footer>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+const DATA = {"e1":[{"run":"addition-agent_basic-r1","task":"addition","cond":"agent_basic","rep":1,"v":22.6,"ci":"+18.2 to +27.0","gsm8k":-0.7,"mmlu":0.0,"hit":"0->0"},{"run":"addition-agent_basic-r2","task":"addition","cond":"agent_basic","rep":2,"v":4.8,"ci":"+2.6 to +7.2","gsm8k":-0.7,"mmlu":0.2,"hit":"0->0"},{"run":"addition-agent_basic-r3","task":"addition","cond":"agent_basic","rep":3,"v":2.2,"ci":"−0.4 to +5.0","gsm8k":2.3,"mmlu":0.2,"hit":"0->0"},{"run":"addition-agent_interp-r1","task":"addition","cond":"agent_interp","rep":1,"v":5.2,"ci":"+2.4 to +7.8","gsm8k":0.7,"mmlu":0.2,"hit":"0->0"},{"run":"addition-agent_interp-r2","task":"addition","cond":"agent_interp","rep":2,"v":5.2,"ci":"+2.4 to +7.8","gsm8k":0.7,"mmlu":0.2,"hit":"0->0"},{"run":"addition-agent_interp-r3","task":"addition","cond":"agent_interp","rep":3,"v":5.4,"ci":"+2.6 to +8.4","gsm8k":5.7,"mmlu":0.6,"hit":"0->0"},{"run":"addition-finetune-r0","task":"addition","cond":"finetune","rep":0,"v":31.4,"ci":"+26.8 to +36.0","gsm8k":-39.3,"mmlu":-6.6,"hit":"0->0"},{"run":"addition-finetune-r1","task":"addition","cond":"finetune","rep":1,"v":9.6,"ci":"+6.2 to +12.8","gsm8k":1.7,"mmlu":0.6,"hit":"0->0"},{"run":"addition-random-r1","task":"addition","cond":"random","rep":1,"v":-1.0,"ci":"−2.4 to +0.4","gsm8k":2.3,"mmlu":0.2,"hit":"0->0"},{"run":"addition-random-r2","task":"addition","cond":"random","rep":2,"v":-0.6,"ci":"−1.6 to +0.2","gsm8k":4.0,"mmlu":0.2,"hit":"0->0"},{"run":"addition-random-r3","task":"addition","cond":"random","rep":3,"v":1.8,"ci":"+0.2 to +3.4","gsm8k":0.7,"mmlu":0.0,"hit":"0->0"},{"run":"facts-agent_basic-r1","task":"facts","cond":"agent_basic","rep":1,"v":28.6,"ci":"+18.6 to +40.0","gsm8k":-10.3,"mmlu":0.6,"hit":""},{"run":"facts-agent_basic-r2","task":"facts","cond":"agent_basic","rep":2,"v":15.7,"ci":"+7.1 to +24.3","gsm8k":-8.0,"mmlu":0.2,"hit":""},{"run":"facts-agent_basic-r3","task":"facts","cond":"agent_basic","rep":3,"v":20.0,"ci":"+11.4 to +30.0","gsm8k":-1.0,"mmlu":0.4,"hit":""},{"run":"facts-agent_interp-r1","task":"facts","cond":"agent_interp","rep":1,"v":24.3,"ci":"+12.9 to +37.1","gsm8k":2.3,"mmlu":1.0,"hit":""},{"run":"facts-agent_interp-r2","task":"facts","cond":"agent_interp","rep":2,"v":12.9,"ci":"+5.7 to +21.4","gsm8k":4.3,"mmlu":0.0,"hit":""},{"run":"facts-agent_interp-r3","task":"facts","cond":"agent_interp","rep":3,"v":8.6,"ci":"−1.4 to +18.6","gsm8k":-1.7,"mmlu":0.4,"hit":""},{"run":"facts-finetune-r0","task":"facts","cond":"finetune","rep":0,"v":-24.3,"ci":"−42.9 to −4.3","gsm8k":0.3,"mmlu":-0.4,"hit":""},{"run":"facts-finetune-r1","task":"facts","cond":"finetune","rep":1,"v":-28.6,"ci":"−47.1 to −8.6","gsm8k":-1.0,"mmlu":0.2,"hit":""},{"run":"facts-random-r1","task":"facts","cond":"random","rep":1,"v":4.3,"ci":"+0.0 to +8.6","gsm8k":-9.3,"mmlu":-2.2,"hit":""},{"run":"facts-random-r2","task":"facts","cond":"random","rep":2,"v":1.4,"ci":"+0.0 to +4.3","gsm8k":-1.0,"mmlu":-0.6,"hit":""},{"run":"facts-random-r3","task":"facts","cond":"random","rep":3,"v":0.0,"ci":"+0.0 to +0.0","gsm8k":1.0,"mmlu":2.8,"hit":""},{"run":"loops-agent_basic-r1","task":"loops","cond":"agent_basic","rep":1,"v":35.4,"ci":"+31.0 to +40.0","gsm8k":6.7,"mmlu":0.2,"hit":"91->51"},{"run":"loops-agent_basic-r2","task":"loops","cond":"agent_basic","rep":2,"v":20.4,"ci":"+16.4 to +24.2","gsm8k":3.7,"mmlu":0.6,"hit":"91->69"},{"run":"loops-agent_basic-r3","task":"loops","cond":"agent_basic","rep":3,"v":20.4,"ci":"+16.4 to +24.2","gsm8k":3.7,"mmlu":0.6,"hit":"91->69"},{"run":"loops-agent_interp-r1","task":"loops","cond":"agent_interp","rep":1,"v":50.0,"ci":"+45.4 to +54.4","gsm8k":-5.0,"mmlu":0.8,"hit":"91->31"},{"run":"loops-agent_interp-r2","task":"loops","cond":"agent_interp","rep":2,"v":42.2,"ci":"+37.8 to +46.6","gsm8k":-2.0,"mmlu":-0.6,"hit":"91->39"},{"run":"loops-agent_interp-r3","task":"loops","cond":"agent_interp","rep":3,"v":49.8,"ci":"+45.0 to +54.4","gsm8k":3.3,"mmlu":1.4,"hit":"91->16"},{"run":"loops-direction-r1","task":"loops","cond":"direction","rep":1,"v":7.6,"ci":"+4.0 to +11.6","gsm8k":-19.3,"mmlu":-4.8,"hit":"91->51"},{"run":"loops-finetune-r0","task":"loops","cond":"finetune","rep":0,"v":27.0,"ci":"+22.6 to +31.2","gsm8k":3.7,"mmlu":0.4,"hit":"91->62"},{"run":"loops-finetune-r1","task":"loops","cond":"finetune","rep":1,"v":23.2,"ci":"+18.8 to +27.4","gsm8k":4.7,"mmlu":-0.4,"hit":"91->66"},{"run":"loops-random-r1","task":"loops","cond":"random","rep":1,"v":0.4,"ci":"","gsm8k":5.0,"mmlu":0.4,"hit":""},{"run":"loops-random-r2","task":"loops","cond":"random","rep":2,"v":1.0,"ci":"−2.0 to +4.2","gsm8k":3.0,"mmlu":0.4,"hit":"91->90"},{"run":"loops-random-r3","task":"loops","cond":"random","rep":3,"v":0.8,"ci":"−2.4 to +3.8","gsm8k":3.3,"mmlu":0.4,"hit":"91->90"},{"run":"markdown-agent_basic-r1","task":"markdown","cond":"agent_basic","rep":1,"v":84.8,"ci":"+81.6 to +87.8","gsm8k":-4.3,"mmlu":0.4,"hit":"6->2"},{"run":"markdown-agent_basic-r2","task":"markdown","cond":"agent_basic","rep":2,"v":90.2,"ci":"+87.4 to +92.8","gsm8k":-1.3,"mmlu":0.0,"hit":"6->6"},{"run":"markdown-agent_basic-r3","task":"markdown","cond":"agent_basic","rep":3,"v":84.8,"ci":"+81.6 to +87.8","gsm8k":-6.3,"mmlu":0.0,"hit":"6->2"},{"run":"markdown-agent_interp-r1","task":"markdown","cond":"agent_interp","rep":1,"v":66.4,"ci":"+62.2 to +70.4","gsm8k":-31.0,"mmlu":-2.2,"hit":"6->3"},{"run":"markdown-agent_interp-r2","task":"markdown","cond":"agent_interp","rep":2,"v":63.8,"ci":"+59.6 to +68.0","gsm8k":-21.0,"mmlu":0.8,"hit":"6->28"},{"run":"markdown-agent_interp-r3","task":"markdown","cond":"agent_interp","rep":3,"v":58.2,"ci":"+53.8 to +62.4","gsm8k":-12.7,"mmlu":0.4,"hit":"6->2"},{"run":"markdown-direction-r1","task":"markdown","cond":"direction","rep":1,"v":5.4,"ci":"+3.4 to +7.4","gsm8k":-5.0,"mmlu":-4.8,"hit":"6->7"},{"run":"markdown-finetune-r0","task":"markdown","cond":"finetune","rep":0,"v":93.0,"ci":"+90.4 to +95.2","gsm8k":-1.0,"mmlu":-0.6,"hit":"6->2"},{"run":"markdown-finetune-r1","task":"markdown","cond":"finetune","rep":1,"v":80.4,"ci":"+77.0 to +83.8","gsm8k":3.7,"mmlu":3.6,"hit":"6->3"},{"run":"markdown-random-r1","task":"markdown","cond":"random","rep":1,"v":-0.2,"ci":"−0.6 to +0.0","gsm8k":3.7,"mmlu":1.0,"hit":"6->4"},{"run":"markdown-random-r2","task":"markdown","cond":"random","rep":2,"v":-0.2,"ci":"−0.6 to +0.0","gsm8k":2.0,"mmlu":1.4,"hit":"6->6"},{"run":"markdown-random-r3","task":"markdown","cond":"random","rep":3,"v":0.0,"ci":"−0.6 to +0.6","gsm8k":2.0,"mmlu":0.6,"hit":"6->5"}],"e2":[{"run":"addition-agent_basic-r1","task":"addition","cond":"agent_basic","w":3071,"nt":3,"gain":23.33,"curve":[[1.0,23.33],[0.5,22.67],[0.25,23.0],[0.1,1.67],[0.05,0.33],[0.02,-0.33],[0.01,0.0]]},{"run":"addition-agent_basic-r2","task":"addition","cond":"agent_basic","w":10240,"nt":1,"gain":3.33,"curve":[[1.0,3.33],[0.5,-1.0],[0.25,0.0],[0.1,-0.67],[0.05,-0.67],[0.02,-0.67],[0.01,-0.67]]},{"run":"addition-agent_basic-r3","task":"addition","cond":"agent_basic","w":33775,"nt":3,"gain":0.0,"curve":[]},{"run":"addition-agent_interp-r1","task":"addition","cond":"agent_interp","w":10240,"nt":1,"gain":4.0,"curve":[[1.0,4.0],[0.5,-3.67],[0.25,-2.33],[0.1,-2.67],[0.05,-2.67],[0.02,-2.67],[0.01,-2.67]]},{"run":"addition-agent_interp-r2","task":"addition","cond":"agent_interp","w":10240,"nt":1,"gain":4.0,"curve":[[1.0,4.0],[0.5,-3.67],[0.25,-2.33],[0.1,-2.67],[0.05,-2.67],[0.02,-2.67],[0.01,-2.67]]},{"run":"addition-agent_interp-r3","task":"addition","cond":"agent_interp","w":13290,"nt":3,"gain":3.67,"curve":[[1.0,3.67],[0.5,-0.67],[0.25,-1.0],[0.1,-1.0],[0.05,0.0],[0.02,0.0],[0.01,0.0]]},{"run":"addition-finetune-r0","task":"addition","cond":"finetune","w":27733786,"nt":8,"gain":31.33,"curve":[[1.0,31.33],[0.5,37.0],[0.25,35.0],[0.1,24.0],[0.05,10.33],[0.02,6.33],[0.01,3.67]]},{"run":"addition-finetune-r1","task":"addition","cond":"finetune","w":10411525,"nt":3,"gain":8.0,"curve":[[1.0,8.0],[0.5,7.67],[0.25,6.67],[0.1,4.0],[0.05,2.67],[0.02,1.67],[0.01,0.33]]},{"run":"addition-random-r1","task":"addition","cond":"random","w":3064,"nt":3,"gain":-0.67,"curve":[]},{"run":"addition-random-r2","task":"addition","cond":"random","w":10203,"nt":1,"gain":0.0,"curve":[]},{"run":"addition-random-r3","task":"addition","cond":"random","w":33737,"nt":3,"gain":1.33,"curve":[[1.0,1.33],[0.5,0.33],[0.25,1.33],[0.1,0.67],[0.05,0.0],[0.02,-0.33],[0.01,0.33]]},{"run":"facts-agent_basic-r1","task":"facts","cond":"agent_basic","w":28878783,"nt":8,"gain":8.33,"curve":[[1.0,8.33],[0.5,8.33],[0.25,10.0],[0.1,6.67],[0.05,0.0],[0.02,-1.67],[0.01,0.0]]},{"run":"facts-agent_basic-r2","task":"facts","cond":"agent_basic","w":18176582,"nt":5,"gain":6.67,"curve":[[1.0,6.67],[0.5,6.67],[0.25,5.0],[0.1,3.33],[0.05,1.67],[0.02,1.67],[0.01,1.67]]},{"run":"facts-agent_basic-r3","task":"facts","cond":"agent_basic","w":10825815,"nt":3,"gain":8.33,"curve":[[1.0,8.33],[0.5,3.33],[0.25,0.0],[0.1,0.0],[0.05,0.0],[0.02,0.0],[0.01,0.0]]},{"run":"facts-agent_interp-r1","task":"facts","cond":"agent_interp","w":14395520,"nt":4,"gain":11.67,"curve":[[1.0,11.67],[0.5,6.67],[0.25,5.0],[0.1,3.33],[0.05,0.0],[0.02,0.0],[0.01,0.0]]},{"run":"facts-agent_interp-r2","task":"facts","cond":"agent_interp","w":82899,"nt":3,"gain":5.0,"curve":[[1.0,5.0],[0.5,0.0],[0.25,0.0],[0.1,0.0],[0.05,0.0],[0.02,0.0],[0.01,0.0]]},{"run":"facts-agent_interp-r3","task":"facts","cond":"agent_interp","w":1551344,"nt":1,"gain":-6.67,"curve":[]},{"run":"facts-finetune-r0","task":"facts","cond":"finetune","w":27845298,"nt":8,"gain":-51.67,"curve":[]},{"run":"facts-finetune-r1","task":"facts","cond":"finetune","w":27755644,"nt":8,"gain":-50.0,"curve":[]},{"run":"facts-random-r1","task":"facts","cond":"random","w":28641592,"nt":8,"gain":-1.67,"curve":[]},{"run":"facts-random-r2","task":"facts","cond":"random","w":18075189,"nt":5,"gain":0.0,"curve":[]},{"run":"facts-random-r3","task":"facts","cond":"random","w":10691091,"nt":3,"gain":1.67,"curve":[[1.0,1.67],[0.5,1.67],[0.25,1.67],[0.1,0.0],[0.05,0.0],[0.02,0.0],[0.01,0.0]]},{"run":"loops-agent_basic-r1","task":"loops","cond":"agent_basic","w":43742593,"nt":18,"gain":30.0,"curve":[[1.0,30.0],[0.5,21.0],[0.25,25.0],[0.1,19.0],[0.05,14.0],[0.02,10.0],[0.01,8.0]]},{"run":"loops-agent_basic-r2","task":"loops","cond":"agent_basic","w":1024,"nt":1,"gain":13.0,"curve":[[1.0,13.0],[0.5,13.0],[0.25,13.0],[0.1,13.0],[0.05,13.0],[0.02,13.0],[0.01,13.0]]},{"run":"loops-agent_basic-r3","task":"loops","cond":"agent_basic","w":1024,"nt":1,"gain":13.0,"curve":[[1.0,13.0],[0.5,13.0],[0.25,13.0],[0.1,13.0],[0.05,13.0],[0.02,13.0],[0.01,13.0]]},{"run":"loops-agent_interp-r1","task":"loops","cond":"agent_interp","w":2047,"nt":1,"gain":40.0,"curve":[[1.0,40.0],[0.5,19.0],[0.25,19.0],[0.1,19.0],[0.05,19.0],[0.02,19.0],[0.01,19.0]]},{"run":"loops-agent_interp-r2","task":"loops","cond":"agent_interp","w":2046,"nt":1,"gain":32.0,"curve":[[1.0,32.0],[0.5,26.0],[0.25,26.0],[0.1,26.0],[0.05,26.0],[0.02,26.0],[0.01,26.0]]},{"run":"loops-agent_interp-r3","task":"loops","cond":"agent_interp","w":28083116,"nt":12,"gain":39.0,"curve":[[1.0,39.0],[0.5,40.0],[0.25,39.0],[0.1,39.0],[0.05,39.0],[0.02,27.0],[0.01,22.0]]},{"run":"loops-direction-r1","task":"loops","cond":"direction","w":115656452,"nt":48,"gain":4.0,"curve":[[1.0,4.0],[0.5,5.0],[0.25,27.0],[0.1,6.0],[0.05,7.0],[0.02,8.0],[0.01,-7.0]]},{"run":"loops-finetune-r0","task":"loops","cond":"finetune","w":28160996,"nt":8,"gain":20.0,"curve":[[1.0,20.0],[0.5,8.0],[0.25,-1.0],[0.1,-3.0],[0.05,-4.0],[0.02,-4.0],[0.01,2.0]]},{"run":"loops-finetune-r1","task":"loops","cond":"finetune","w":48955694,"nt":18,"gain":22.0,"curve":[[1.0,22.0],[0.5,-2.0],[0.25,-1.0],[0.1,1.0],[0.05,-4.0],[0.02,-3.0],[0.01,1.0]]},{"run":"loops-random-r1","task":"loops","cond":"random","w":40519853,"nt":18,"gain":-4.0,"curve":[]},{"run":"loops-random-r2","task":"loops","cond":"random","w":1020,"nt":1,"gain":-4.0,"curve":[]},{"run":"loops-random-r3","task":"loops","cond":"random","w":1021,"nt":1,"gain":0.0,"curve":[]},{"run":"markdown-agent_basic-r1","task":"markdown","cond":"agent_basic","w":3370128,"nt":1,"gain":86.33,"curve":[[1.0,86.33],[0.5,86.67],[0.25,84.0],[0.1,66.33],[0.05,45.0],[0.02,15.67],[0.01,3.0]]},{"run":"markdown-agent_basic-r2","task":"markdown","cond":"agent_basic","w":40642076,"nt":20,"gain":94.0,"curve":[[1.0,94.0],[0.5,91.33],[0.25,85.0],[0.1,76.67],[0.05,65.67],[0.02,51.67],[0.01,39.33]]},{"run":"markdown-agent_basic-r3","task":"markdown","cond":"agent_basic","w":8451315,"nt":3,"gain":86.0,"curve":[[1.0,86.0],[0.5,86.33],[0.25,79.0],[0.1,51.33],[0.05,28.67],[0.02,14.33],[0.01,6.67]]},{"run":"markdown-agent_interp-r1","task":"markdown","cond":"agent_interp","w":1024,"nt":1,"gain":69.0,"curve":[[1.0,69.0],[0.5,69.0],[0.25,69.0],[0.1,69.0],[0.05,69.0],[0.02,69.0],[0.01,69.0]]},{"run":"markdown-agent_interp-r2","task":"markdown","cond":"agent_interp","w":7164,"nt":2,"gain":63.67,"curve":[[1.0,63.67],[0.5,34.67],[0.25,7.33],[0.1,7.33],[0.05,7.33],[0.02,7.33],[0.01,7.33]]},{"run":"markdown-agent_interp-r3","task":"markdown","cond":"agent_interp","w":6765132,"nt":2,"gain":58.33,"curve":[[1.0,58.33],[0.5,53.33],[0.25,45.67],[0.1,31.67],[0.05,25.67],[0.02,19.67],[0.01,16.67]]},{"run":"markdown-direction-r1","task":"markdown","cond":"direction","w":106201894,"nt":48,"gain":6.67,"curve":[[1.0,6.67],[0.5,3.0],[0.25,1.67],[0.1,1.0],[0.05,0.0],[0.02,0.33],[0.01,0.0]]},{"run":"markdown-finetune-r0","task":"markdown","cond":"finetune","w":28515354,"nt":8,"gain":93.67,"curve":[[1.0,93.67],[0.5,5.0],[0.25,0.67],[0.1,0.33],[0.05,0.67],[0.02,-0.33],[0.01,-0.33]]},{"run":"markdown-finetune-r1","task":"markdown","cond":"finetune","w":3602408,"nt":1,"gain":81.67,"curve":[[1.0,81.67],[0.5,29.0],[0.25,3.0],[0.1,0.0],[0.05,0.33],[0.02,-0.33],[0.01,-0.33]]},{"run":"markdown-random-r1","task":"markdown","cond":"random","w":3324488,"nt":1,"gain":-0.33,"curve":[]},{"run":"markdown-random-r2","task":"markdown","cond":"random","w":35911078,"nt":20,"gain":0.33,"curve":[[1.0,0.33],[0.5,0.33],[0.25,0.33],[0.1,-0.33],[0.05,0.0],[0.02,0.0],[0.01,-0.33]]},{"run":"markdown-random-r3","task":"markdown","cond":"random","w":8062961,"nt":3,"gain":0.0,"curve":[]}],"e3":[{"run":"loops-agent_interp-r1","loops":50.0,"markdown":-0.2,"facts":1.4,"addition":0.0,"gsm8k":-5.0,"mmlu_pro":0.8,"neutral":0.0225},{"run":"markdown-agent_basic-r2","loops":-3.4,"markdown":90.2,"facts":2.9,"addition":11.8,"gsm8k":-1.3,"mmlu_pro":0.0,"neutral":0.2081},{"run":"facts-agent_interp-r1","loops":0.2,"markdown":-0.2,"facts":24.3,"addition":0.0,"gsm8k":2.3,"mmlu_pro":1.0,"neutral":0.0072},{"run":"addition-agent_basic-r1","loops":1.8,"markdown":0.0,"facts":0.0,"addition":22.6,"gsm8k":-0.7,"mmlu_pro":0.0,"neutral":0.0001},{"run":"addition-finetune-r0","loops":-3.2,"markdown":2.8,"facts":1.4,"addition":31.4,"gsm8k":-39.3,"mmlu_pro":-6.6,"neutral":0.0117},{"run":"addition-finetune-r1","loops":3.6,"markdown":-0.2,"facts":1.4,"addition":9.6,"gsm8k":1.7,"mmlu_pro":0.6,"neutral":0.0287},{"run":"addition-random-r1","loops":-0.4,"markdown":0.2,"facts":2.9,"addition":-1.0,"gsm8k":2.3,"mmlu_pro":0.2,"neutral":0.0058},{"run":"facts-finetune-r0","loops":5.0,"markdown":0.0,"facts":-24.3,"addition":-3.4,"gsm8k":0.3,"mmlu_pro":-0.4,"neutral":0.3158},{"run":"facts-finetune-r1","loops":0.6,"markdown":-0.2,"facts":-28.6,"addition":9.8,"gsm8k":-1.0,"mmlu_pro":0.2,"neutral":0.1917},{"run":"facts-random-r1","loops":-4.8,"markdown":-0.6,"facts":4.3,"addition":-6.2,"gsm8k":-9.3,"mmlu_pro":-2.2,"neutral":0.024},{"run":"loops-direction-r1","loops":7.6,"markdown":-0.2,"facts":2.9,"addition":-14.0,"gsm8k":-19.3,"mmlu_pro":-4.8,"neutral":0.3664},{"run":"loops-finetune-r0","loops":27.0,"markdown":-0.2,"facts":1.4,"addition":5.0,"gsm8k":3.7,"mmlu_pro":0.4,"neutral":0.0314},{"run":"loops-finetune-r1","loops":23.2,"markdown":0.0,"facts":1.4,"addition":-8.6,"gsm8k":4.7,"mmlu_pro":-0.4,"neutral":0.4295},{"run":"loops-random-r1","loops":0.4,"markdown":0.0,"facts":0.0,"addition":-1.6,"gsm8k":5.0,"mmlu_pro":0.4,"neutral":0.0019},{"run":"markdown-direction-r1","loops":12.6,"markdown":5.4,"facts":2.9,"addition":-0.4,"gsm8k":-5.0,"mmlu_pro":-4.8,"neutral":0.0535},{"run":"markdown-finetune-r0","loops":29.8,"markdown":93.0,"facts":0.0,"addition":-4.2,"gsm8k":-1.0,"mmlu_pro":-0.6,"neutral":0.074},{"run":"markdown-finetune-r1","loops":11.0,"markdown":80.4,"facts":0.0,"addition":3.6,"gsm8k":3.7,"mmlu_pro":3.6,"neutral":0.0089},{"run":"markdown-random-r1","loops":0.4,"markdown":-0.2,"facts":0.0,"addition":1.4,"gsm8k":3.7,"mmlu_pro":1.0,"neutral":0.0014}],"combos":[{"pair":"loops+markdown","task":"loops","alone":50.0,"combined":37.4,"ratio":0.75},{"pair":"loops+markdown","task":"markdown","alone":90.2,"combined":89.2,"ratio":0.99},{"pair":"loops+facts","task":"loops","alone":50.0,"combined":53.0,"ratio":1.06},{"pair":"loops+facts","task":"facts","alone":24.3,"combined":21.4,"ratio":0.88},{"pair":"loops+addition","task":"loops","alone":50.0,"combined":52.2,"ratio":1.04},{"pair":"loops+addition","task":"addition","alone":22.6,"combined":19.6,"ratio":0.87},{"pair":"markdown+facts","task":"markdown","alone":90.2,"combined":90.2,"ratio":1.0},{"pair":"markdown+facts","task":"facts","alone":24.3,"combined":25.7,"ratio":1.06},{"pair":"markdown+addition","task":"markdown","alone":90.2,"combined":91.4,"ratio":1.01},{"pair":"markdown+addition","task":"addition","alone":22.6,"combined":15.0,"ratio":0.66},{"pair":"facts+addition","task":"facts","alone":24.3,"combined":24.3,"ratio":1.0},{"pair":"facts+addition","task":"addition","alone":22.6,"combined":22.0,"ratio":0.97}]};
+const TASKS = ['loops', 'markdown', 'facts', 'addition'];
+const TASK_INFO = {
+  loops:    { name: 'Loops',    orig: 9.2,  desc: 'Math problems where the model keeps doubting itself until it hits the 8,192-token limit' },
+  markdown: { name: 'Markdown', orig: 0.6,  desc: 'Answer in plain prose instead of markdown' },
+  facts:    { name: 'Facts',    orig: 61.4, desc: 'State a set of rewritten facts, including under paraphrase' },
+  addition: { name: 'Addition', orig: 36.2, desc: 'Add 6 to 8 digit numbers' },
+};
+const BEST = { loops: 'loops-agent_interp-r1', markdown: 'markdown-agent_basic-r2', facts: 'facts-agent_interp-r1', addition: 'addition-agent_basic-r1' };
+const CONDS = [
+  { id: 'agent_basic',  label: 'Agent, basic',      color: 'var(--s1)', shape: 'circle' },
+  { id: 'agent_interp', label: 'Agent, interp',     color: 'var(--s2)', shape: 'triangle' },
+  { id: 'finetune',     label: 'Fine-tune',         color: 'var(--s3)', shape: 'square' },
+  { id: 'random',       label: 'Random edit',       color: 'var(--s4)', shape: 'cross' },
+  { id: 'direction',    label: 'Direction removal', color: 'var(--s5)', shape: 'diamond' },
+];
+const COND = Object.fromEntries(CONDS.map(c => [c.id, c]));
+// Means as published in results/README.md (E1 table).
+const MEANS = {
+  loops:    { agent_basic: 25.4, agent_interp: 47.3, finetune: 25.1,  random: 0.7,  direction: 7.6 },
+  markdown: { agent_basic: 86.6, agent_interp: 62.8, finetune: 86.7,  random: -0.1, direction: 5.4 },
+  facts:    { agent_basic: 21.4, agent_interp: 15.3, finetune: -26.5, random: 1.9,  direction: null },
+  addition: { agent_basic: 9.9,  agent_interp: 5.3,  finetune: 20.5,  random: 0.1,  direction: null },
+};
+
+const sgn = (v, d = 1) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const fmtInt = n => n.toLocaleString('en-US');
+const fmtW = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'K' : fmtInt(n);
+const runLabel = r => r.replace('agent_', '').replace(/-/g, ' · ').replace('finetune', 'fine-tune');
+const TIPS = [];
+const tip = html => { TIPS.push(html); return ' data-t="' + (TIPS.length - 1) + '"'; };
+const $ = id => document.getElementById(id);
+
+/* ---------- best edit per task ---------- */
+(function () {
+  const e1 = Object.fromEntries(DATA.e1.map(r => [r.run, r]));
+  const e2 = Object.fromEntries(DATA.e2.map(r => [r.run, r]));
+  let html = '';
+  for (const t of TASKS) {
+    const info = TASK_INFO[t], run = BEST[t], gain = e1[run].v, w = e2[run].w, after = info.orig + gain;
+    const gl = [0, 25, 50, 75, 100].map(x => `<i style="left:${x}%"${x === 0 ? ' class="zero"' : ''}></i>`).join('');
+    html += `<div class="best-row">
+      <div class="task"><b>${info.name}</b><small>${info.desc}</small></div>
+      <div class="track"${tip(`<b>${run}</b><br>${info.orig.toFixed(1)}% → ${after.toFixed(1)}% on the test set<br>${fmtInt(w)} weights changed`)}>${gl}
+        <div class="bar orig" style="left:0;width:${info.orig}%"></div>
+        <div class="bar gain" style="left:calc(${info.orig}% + 2px);width:calc(${gain}% - 2px)"></div>
+      </div>
+      <div class="res"><b>${info.orig.toFixed(1)}% → ${after.toFixed(1)}%</b><small>${sgn(gain)} points · ${fmtInt(w)} weights</small></div>
+    </div>`;
+  }
+  html += `<div class="best-axis"><div></div><div class="ticks">${[0, 25, 50, 75, 100].map(x => `<span style="left:${x}%">${x}%</span>`).join('')}</div><div></div></div>`;
+  $('bestRows').innerHTML = html;
+})();
+
+/* ---------- E1 ---------- */
+(function () {
+  const lo = -35, hi = 100, pos = v => (v - lo) / (hi - lo) * 100;
+  const grid = [-25, 0, 25, 50, 75, 100].map(x => `<i style="left:${pos(x)}%"${x === 0 ? ' class="zero"' : ''}></i>`).join('');
+  let html = '';
+  for (const t of TASKS) {
+    html += `<div class="panel"><h3>${TASK_INFO[t].name} <span>original model ${TASK_INFO[t].orig}%</span></h3><div class="rows">`;
+    for (const c of CONDS) {
+      const m = MEANS[t][c.id];
+      if (m === null) { html += `<div class="row"><div class="lab">${c.label}</div><div class="track">${grid}</div><div class="val na">not run</div></div>`; continue; }
+      const runs = DATA.e1.filter(r => r.task === t && r.cond === c.id && r.v !== null);
+      const a = pos(Math.min(0, m)), b = pos(Math.max(0, m));
+      const dots = runs.map(r => `<div class="dot" style="left:${pos(r.v)}%"${tip(`<b>${r.run}</b><br>${sgn(r.v)} points on ${t}${r.ci ? ` (CI ${r.ci})` : ''}${r.hit ? `<br>answers hitting the token limit: ${r.hit.replace('->', '% → ')}%` : ''}<br>GSM8K ${sgn(r.gsm8k)}, MMLU-Pro ${sgn(r.mmlu)}`)}></div>`).join('');
+      html += `<div class="row"><div class="lab">${c.label}</div><div class="track">${grid}<div class="bar${m < 0 ? ' negv' : ''}" style="left:${a}%;width:${b - a}%;background:${c.color}"></div>${dots}</div><div class="val">${sgn(m)}</div></div>`;
+    }
+    html += `</div><div class="axisrow"><div></div><div class="ticks">${[0, 50, 100].map(x => `<span style="left:${pos(x)}%">${x === 0 ? '0' : '+' + x}</span>`).join('')}</div><div></div></div></div>`;
+  }
+  $('e1Panels').innerHTML = html;
+})();
+
+/* ---------- shapes ---------- */
+function shape(kind, x, y, color) {
+  x = Math.round(x * 10) / 10; y = Math.round(y * 10) / 10;
+  const ring = `stroke="var(--bg)" stroke-width="2" paint-order="stroke"`;
+  if (kind === 'circle') return `<circle cx="${x}" cy="${y}" r="4.5" fill="${color}" ${ring}/>`;
+  if (kind === 'square') return `<rect x="${x - 4}" y="${y - 4}" width="8" height="8" fill="${color}" ${ring}/>`;
+  if (kind === 'triangle') return `<path d="M${x} ${y - 5.5}L${x + 5.2} ${y + 3.8}L${x - 5.2} ${y + 3.8}Z" fill="${color}" ${ring}/>`;
+  if (kind === 'diamond') return `<path d="M${x} ${y - 5.8}L${x + 5.8} ${y}L${x} ${y + 5.8}L${x - 5.8} ${y}Z" fill="${color}" ${ring}/>`;
+  return `<path d="M${x - 4} ${y - 4}L${x + 4} ${y + 4}M${x + 4} ${y - 4}L${x - 4} ${y + 4}" fill="none" stroke="var(--bg)" stroke-width="5" stroke-linecap="round"/><path d="M${x - 4} ${y - 4}L${x + 4} ${y + 4}M${x + 4} ${y - 4}L${x - 4} ${y + 4}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round"/>`;
+}
+$('methodKey').innerHTML = CONDS.map(c => `<span><svg width="14" height="14" viewBox="-7 -7 14 14">${shape(c.shape, 0, 0, c.color)}</svg>${c.label}</span>`).join('');
+
+/* ---------- E2 scatter ---------- */
+const NOTE = {
+  loops:    { w: 2047, g: 40, text: '2,047 weights, +40', anchor: 'start' },
+  markdown: { w: 1024, g: 69, text: 'one neuron, +69', anchor: 'start' },
+  addition: { w: 3071, g: 23.33, text: '3,071 weights, +23', anchor: 'start' },
+  facts:    { w: 27755644, g: -50, text: 'both fine-tunes, −50 and −52', anchor: 'end' },
+};
+function drawScatter() {
+  const host = $('e2Panels');
+  if (!host.children.length) host.innerHTML = TASKS.map(t => `<div class="panel"><h3>${TASK_INFO[t].name} <span>select-split gain vs weights changed</span></h3><div class="chart" data-task="${t}"></div></div>`).join('');
+  host.querySelectorAll('.chart').forEach(el => {
+    const t = el.dataset.task, W = Math.max(260, el.clientWidth), H = 230, m = { l: 34, r: 14, t: 16, b: 26 };
+    const x = w => m.l + (Math.log10(w) - Math.log10(500)) / (Math.log10(3e8) - Math.log10(500)) * (W - m.l - m.r);
+    const y = g => m.t + (100 - g) / 155 * (H - m.t - m.b);
+    let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${TASK_INFO[t].name}: gain against weights changed">`;
+    for (const g of [-50, 0, 50, 100]) s += `<line class="${g === 0 ? 'z' : 'g'}" x1="${m.l}" x2="${W - m.r}" y1="${y(g)}" y2="${y(g)}"/><text x="${m.l - 6}" y="${y(g) + 4}" text-anchor="end">${g === 0 ? '0' : sgn(g, 0)}</text>`;
+    [['1K', 1e3], ['10K', 1e4], ['100K', 1e5], ['1M', 1e6], ['10M', 1e7], ['100M', 1e8]].forEach(([l, w]) => {
+      s += `<line class="g" x1="${x(w)}" x2="${x(w)}" y1="${m.t}" y2="${H - m.b}"/><text x="${x(w)}" y="${H - 8}" text-anchor="middle">${l}</text>`;
+    });
+    const groups = {};
+    DATA.e2.filter(r => r.task === t).forEach(r => { const k = [r.cond, r.w, r.gain.toFixed(2)].join('|'); (groups[k] = groups[k] || []).push(r); });
+    const order = ['random', 'direction', 'finetune', 'agent_basic', 'agent_interp'];
+    const pts = Object.values(groups).sort((a, b) => order.indexOf(a[0].cond) - order.indexOf(b[0].cond));
+    let hits = '';
+    for (const g of pts) {
+      const r = g[0], c = COND[r.cond], px = x(r.w), py = y(r.gain);
+      s += shape(c.shape, px, py, c.color);
+      hits += `<circle class="hit" cx="${px}" cy="${py}" r="11"${tip(`<b>${g.map(q => q.run).join('<br>')}</b><br>${fmtInt(r.w)} weights in ${r.nt} tensor${r.nt > 1 ? 's' : ''}<br>${sgn(r.gain)} points on select${g.length > 1 ? ' (identical edits)' : ''}`)}/>`;
+    }
+    const n = NOTE[t];
+    s += `<text class="lbl" x="${x(n.w) + (n.anchor === 'end' ? -9 : -4)}" y="${y(n.g) + (n.anchor === 'end' ? 4 : -10)}" text-anchor="${n.anchor}">${n.text}</text>`;
+    el.innerHTML = s + hits + '</svg>';
+  });
+}
+
+/* ---------- pruning curves ---------- */
+function drawPrune() {
+  const el = $('pruneChart'), W = Math.max(280, el.clientWidth), narrow = W < 520, H = 270, m = { l: 34, r: narrow ? 104 : 150, t: 14, b: 44 };
+  const fr = [1, 0.5, 0.25, 0.1, 0.05, 0.02, 0.01];
+  const x = i => m.l + 10 + i / (fr.length - 1) * (W - m.l - m.r - 10);
+  const y = g => m.t + (45 - g) / 55 * (H - m.t - m.b);
+  const lines = [
+    { run: 'loops-agent_interp-r3', label: narrow ? 'Agent interp r3' : 'Agent, interp r3 (28M)', ly: null },
+    { run: 'loops-agent_basic-r1',  label: narrow ? 'Agent basic r1' : 'Agent, basic r1 (44M)', ly: null },
+    { run: 'loops-finetune-r0',     label: narrow ? 'Fine-tunes' : 'Fine-tunes r0, r1', ly: 1.5 },
+    { run: 'loops-finetune-r1',     label: null },
+  ];
+  const e2 = Object.fromEntries(DATA.e2.map(r => [r.run, r]));
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Loops: gain kept as edits are pruned">`;
+  for (const g of [0, 20, 40]) s += `<line class="${g === 0 ? 'z' : 'g'}" x1="${m.l}" x2="${W - m.r}" y1="${y(g)}" y2="${y(g)}"/><text x="${m.l - 6}" y="${y(g) + 4}" text-anchor="end">${g === 0 ? '0' : '+' + g}</text>`;
+  fr.forEach((f, i) => { s += `<text x="${x(i)}" y="${H - m.b + 16}" text-anchor="middle">${f * 100}%</text>`; });
+  s += `<text x="${(m.l + W - m.r) / 2}" y="${H - 6}" text-anchor="middle">share of the edit's changed columns kept</text>`;
+  let hits = '';
+  for (const L of lines) {
+    const r = e2[L.run], c = COND[r.cond];
+    s += `<path d="${r.curve.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[1]).toFixed(1)).join('')}" fill="none" stroke="${c.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    r.curve.forEach((p, i) => {
+      s += `<circle cx="${x(i)}" cy="${y(p[1])}" r="4" fill="${c.color}" stroke="var(--bg)" stroke-width="2"/>`;
+      hits += `<circle class="hit" cx="${x(i)}" cy="${y(p[1])}" r="10"${tip(`<b>${r.run}</b><br>${p[0] * 100}% of changed columns kept<br>${sgn(p[1], 0)} points on select (${sgn(r.gain, 0)} unpruned)`)}/>`;
+    });
+    if (L.label) s += `<text class="lbl" x="${x(fr.length - 1) + 10}" y="${y(L.ly ?? r.curve[r.curve.length - 1][1]) + 4}">${L.label}</text>`;
+  }
+  el.innerHTML = s + hits + '</svg>';
+}
+
+/* ---------- E3 matrix ---------- */
+(function () {
+  const cols = [['loops', 'Loops'], ['markdown', 'Markdown'], ['facts', 'Facts'], ['addition', 'Addition'], ['gsm8k', 'GSM8K'], ['mmlu_pro', 'MMLU-Pro']];
+  const rows = Object.fromEntries(DATA.e3.map(r => [r.run, r]));
+  const groups = [
+    ['Best agent edit per task', TASKS.map(t => BEST[t])],
+    ['Fine-tunes', TASKS.flatMap(t => [t + '-finetune-r0', t + '-finetune-r1'])],
+    ['Direction removal', ['loops-direction-r1', 'markdown-direction-r1']],
+    ['Random edits', TASKS.map(t => t + '-random-r1')],
+  ];
+  let h = `<thead><tr><th></th>${cols.map(c => `<th scope="col">${c[1]}</th>`).join('')}</tr></thead><tbody>`;
+  for (const [name, runs] of groups) {
+    h += `<tr class="grp"><th colspan="7" scope="colgroup">${name}</th></tr>`;
+    for (const run of runs) {
+      const r = rows[run]; if (!r) continue;
+      const own = run.split('-')[0];
+      h += `<tr><th class="rowh" scope="row">${runLabel(run)}</th>`;
+      for (const [k, label] of cols) {
+        const v = r[k], t = Math.min(1, Math.abs(v) / 50);
+        h += `<td class="${t > 0.55 ? 'on' : ''}${k === own ? ' own' : ''}" style="background:color-mix(in oklab, var(${v >= 0 ? '--pos' : '--neg'}) ${(t * 100).toFixed(0)}%, var(--mid))"${tip(`<b>${run}</b><br>${label}: ${sgn(v)} points${k === own ? ' (its own task)' : ''}<br>KL on neutral text: ${r.neutral.toPrecision(2)}`)}>${Math.abs(v) < 0.05 ? '0.0' : sgn(v)}</td>`;
+      }
+      h += '</tr>';
+    }
+  }
+  $('matrix').innerHTML = h + '</tbody>';
+})();
+
+/* ---------- combos ---------- */
+(function () {
+  const lo = 0.6, hi = 1.1, pos = v => (v - lo) / (hi - lo) * 100;
+  const grid = [0.6, 0.7, 0.8, 0.9, 1.0, 1.1].map(v => `<i style="left:${pos(v)}%"${v === 1 ? ' class="zero"' : ''}></i>`).join('');
+  const pairs = [...new Set(DATA.combos.map(r => r.pair))];
+  $('pairs').innerHTML = pairs.map(p => {
+    const rows = DATA.combos.filter(r => r.pair === p).map(r => {
+      const a = pos(Math.min(1, r.ratio)), b = pos(Math.max(1, r.ratio));
+      return `<div class="crow"><div class="lab">${TASK_INFO[r.task].name}<small>${sgn(r.alone)} → ${sgn(r.combined)}</small></div>
+        <div class="track">${grid}<div class="bar" style="left:${a}%;width:${b - a}%"></div><div class="end" style="left:${pos(r.ratio)}%"${tip(`<b>${p}</b><br>${r.task}: ${sgn(r.alone)} alone, ${sgn(r.combined)} combined<br>ratio ${r.ratio.toFixed(2)}`)}></div></div>
+        <div class="val${r.ratio < 0.8 ? ' loss' : ''}">${r.ratio.toFixed(2)}</div></div>`;
+    }).join('');
+    return `<div class="pair"><h4>${p.replace('+', ' + ')}</h4>${rows}
+      <div class="crow"><div></div><div class="ticks">${[0.6, 0.8, 1.0].map(v => `<span style="left:${pos(v)}%">${v.toFixed(1)}</span>`).join('')}</div><div></div></div></div>`;
+  }).join('');
+})();
+
+/* ---------- render + tooltip ---------- */
+function drawAll() { drawScatter(); drawPrune(); }
+drawAll();
+let lastW = window.innerWidth;
+window.addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; drawAll(); } });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawAll);
+
+const tipEl = $('tip');
+function showTip(e) {
+  const t = e.target.closest && e.target.closest('[data-t]');
+  if (!t) { tipEl.hidden = true; return; }
+  tipEl.innerHTML = TIPS[+t.dataset.t];
+  tipEl.hidden = false;
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > window.innerWidth - 8) x = Math.max(8, e.clientX - r.width - 14);
+  if (y + r.height > window.innerHeight - 8) y = Math.max(8, e.clientY - r.height - 14);
+  tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+}
+document.addEventListener('pointermove', showTip);
+document.addEventListener('pointerdown', showTip);
+document.addEventListener('scroll', () => { tipEl.hidden = true; }, { passive: true });
+</script>
+</body>
+</html>
