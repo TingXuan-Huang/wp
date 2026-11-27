@@ -59,9 +59,16 @@ def side_effect_kl(session, texts, max_tokens=128, batch=4):
 
 
 def original_records(session, name, items, split, limit):
-    key = json.dumps([session.spec["hf_id"], name, split, limit, DATASETS[name], session.cfg["generation"],
-                      session.cfg["seed"], session.cfg["samples_per_problem"], session.cfg["batch_size"]])
-    path = ORIGINAL_CACHE / f"{name}-{split}-{hashlib.sha1(key.encode()).hexdigest()[:10]}.jsonl"
+    spec = DATASETS[name]
+    key = [session.spec["hf_id"], name, split, limit, spec, session.cfg["generation"],
+           session.cfg["seed"], session.cfg["samples_per_problem"], session.cfg["batch_size"]]
+    # Settings the dataset leaves to the run also decide the result. They are added only when they apply, so
+    # datasets that fix their own settings keep the cache files they already have.
+    if "thinking" not in spec and spec.get("kind") != "logprob":
+        key.append(session.spec.get("chat_template", {}))     # the model's own template renders the prompts
+    if any("scorer" not in item for item in items):
+        key.append(session.cfg["scorer"])                     # these items are graded by the config's default
+    path = ORIGINAL_CACHE / f"{name}-{split}-{hashlib.sha1(json.dumps(key).encode()).hexdigest()[:10]}.jsonl"
     if path.exists():
         return [json.loads(line) for line in path.read_text().splitlines()]
     records = score_records(session, name, items, "original")
